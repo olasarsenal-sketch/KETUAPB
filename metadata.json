@@ -1,0 +1,6 @@
+{
+  "name": "E-Badminton - Pemilihan Ketua Ekstrakurikuler",
+  "description": "Aplikasi E-Voting resmi pemilihan Ketua & Wakil Ketua Ekstrakurikuler Bulutangkis dengan pencatatan nama pemilih, integrasi Supabase, dan rekapitulasi real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
