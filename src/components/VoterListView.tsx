@@ -126,7 +126,7 @@ export const VoterListView: React.FC<VoterListViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          {onResetAllVotes && (
+          {isAdmin && onResetAllVotes && (
             <button
               type="button"
               onClick={() => {

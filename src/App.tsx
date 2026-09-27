@@ -90,19 +90,23 @@ export default function App() {
   const [allVotes, setAllVotes] = useState<VoteRecord[]>(() => storageService.getLocalVotes());
   const [isLoadingVotes, setIsLoadingVotes] = useState(false);
 
-  // Refresh votes & DPT
+  // Refresh votes, candidates & DPT
   const refreshAllData = useCallback(async () => {
     setIsLoadingVotes(true);
     try {
       const records = await storageService.getAllVotes();
       setAllVotes(records);
-      setCandidates(storageService.getCandidates());
-      setRegisteredVoters(storageService.getRegisteredVoters());
+      const remoteCandidates = await storageService.getCandidatesAsync();
+      setCandidates(remoteCandidates);
+      const remoteVoters = await storageService.getRegisteredVotersAsync();
+      setRegisteredVoters(remoteVoters);
       setElectionSettings(storageService.getElectionSettings());
       setSupabaseConfig(storageService.getSupabaseConfig());
     } catch (e) {
       console.error('Gagal memuat data:', e);
       setAllVotes(storageService.getLocalVotes());
+      setCandidates(storageService.getCandidates());
+      setRegisteredVoters(storageService.getRegisteredVoters());
     } finally {
       setIsLoadingVotes(false);
     }
@@ -110,6 +114,20 @@ export default function App() {
 
   useEffect(() => {
     refreshAllData();
+
+    // Berlangganan (subscribe) real-time perubahan data kandidat & voters dari Supabase
+    const unsubscribeCandidates = storageService.subscribeCandidates((freshCandidates) => {
+      setCandidates(freshCandidates);
+    });
+
+    const unsubscribeVoters = storageService.subscribeVoters((freshVoters) => {
+      setRegisteredVoters(freshVoters);
+    });
+
+    return () => {
+      unsubscribeCandidates();
+      unsubscribeVoters();
+    };
   }, [refreshAllData]);
 
   // LOGIN HANDLERS
@@ -125,15 +143,29 @@ export default function App() {
       gender: voter.gender,
     });
 
-    // Jika siswa sudah pernah vote, cek bukti suaranya
+    // Jika siswa sudah pernah vote, arahkan ke bukti suara (1 Siswa = 1 Kali Pakai)
     if (voter.hasVoted) {
       const existingVote = allVotes.find(v => v.nisn.toLowerCase() === voter.nisn.toLowerCase());
       if (existingVote) {
         setLastVoteReceipt(existingVote);
-        setVoteSubStep('success');
       } else {
-        setVoteSubStep('voting');
+        setLastVoteReceipt({
+          id: `vote-${voter.nisn}`,
+          voteCode: voter.voteCode || 'TERVERIFIKASI-SUPABASE',
+          createdAt: voter.votedAt || new Date().toISOString(),
+          voterName: voter.name,
+          nisn: voter.nisn,
+          studentClass: voter.studentClass,
+          candidatePutraId: '-',
+          candidatePutraName: 'Pilihan Tersimpan Sah',
+          candidatePutraNumber: '-',
+          candidatePutriId: '-',
+          candidatePutriName: 'Pilihan Tersimpan Sah',
+          candidatePutriNumber: '-',
+          syncedToSupabase: true,
+        });
       }
+      setVoteSubStep('success');
     } else {
       setLastVoteReceipt(null);
       setVoteSubStep('voting');
@@ -213,49 +245,76 @@ export default function App() {
     handleLogout();
   };
 
-  // ADMIN ACTIONS
-  const handleSaveCandidates = (updatedList: Candidate[]) => {
-    storageService.saveCandidates(updatedList);
+  // ADMIN ACTIONS - KANDIDAT DENGAN SUPABASE REAL-TIME
+  const handleSaveCandidates = async (updatedList: Candidate[]) => {
+    await storageService.saveCandidates(updatedList);
     setCandidates(updatedList);
   };
 
-  const handleResetCandidates = () => {
-    storageService.resetCandidates();
-    setCandidates(storageService.getCandidates());
+  const handleResetCandidates = async () => {
+    await storageService.resetCandidates();
+    const fresh = await storageService.getCandidatesAsync();
+    setCandidates(fresh);
   };
 
-  const handleAddVoter = (voterData: Omit<RegisteredVoter, 'id' | 'hasVoted'>) => {
-    storageService.addRegisteredVoter(voterData);
-    setRegisteredVoters(storageService.getRegisteredVoters());
+  const handleAddCandidate = async (candidate: Candidate) => {
+    const res = await storageService.addCandidate(candidate);
+    const fresh = await storageService.getCandidatesAsync();
+    setCandidates(fresh);
+    return res;
   };
 
-  const handleUpdateVoter = (voter: RegisteredVoter) => {
-    storageService.updateRegisteredVoter(voter);
-    setRegisteredVoters(storageService.getRegisteredVoters());
+  const handleUpdateCandidate = async (candidate: Candidate) => {
+    const res = await storageService.updateCandidate(candidate);
+    const fresh = await storageService.getCandidatesAsync();
+    setCandidates(fresh);
+    return res;
+  };
+
+  const handleDeleteCandidate = async (id: string) => {
+    const res = await storageService.deleteCandidate(id);
+    const fresh = await storageService.getCandidatesAsync();
+    setCandidates(fresh);
+    return res;
+  };
+
+  const handleAddVoter = async (voterData: Omit<RegisteredVoter, 'id' | 'hasVoted'>) => {
+    await storageService.addRegisteredVoter(voterData);
+    const fresh = await storageService.getRegisteredVotersAsync();
+    setRegisteredVoters(fresh);
+  };
+
+  const handleUpdateVoter = async (voter: RegisteredVoter) => {
+    await storageService.updateRegisteredVoter(voter);
+    const fresh = await storageService.getRegisteredVotersAsync();
+    setRegisteredVoters(fresh);
   };
 
   const handleDeleteVoter = async (id: string) => {
     await storageService.deleteRegisteredVoter(id);
-    setRegisteredVoters(storageService.getRegisteredVoters());
+    const fresh = await storageService.getRegisteredVotersAsync();
+    setRegisteredVoters(fresh);
     setAllVotes(storageService.getLocalVotes());
     await refreshAllData();
   };
 
   const handleResetVoterStatus = async (nisn: string) => {
     await storageService.resetVoterVoteStatus(nisn);
-    setRegisteredVoters(storageService.getRegisteredVoters());
+    const fresh = await storageService.getRegisteredVotersAsync();
+    setRegisteredVoters(fresh);
     setAllVotes(storageService.getLocalVotes());
     await refreshAllData();
   };
 
   const handleResetAllVotersToDefault = async () => {
-    storageService.resetRegisteredVotersToDefault();
-    setRegisteredVoters(storageService.getRegisteredVoters());
+    await storageService.resetRegisteredVotersToDefault();
+    const fresh = await storageService.getRegisteredVotersAsync();
+    setRegisteredVoters(fresh);
     await refreshAllData();
   };
 
   const handleDeleteAllVoters = async () => {
-    storageService.deleteAllRegisteredVoters();
+    await storageService.deleteAllRegisteredVoters();
     setRegisteredVoters([]);
     await refreshAllData();
   };
@@ -354,12 +413,17 @@ export default function App() {
               supabaseConfig={supabaseConfig}
               onSaveCandidates={handleSaveCandidates}
               onResetCandidates={handleResetCandidates}
+              onAddCandidate={handleAddCandidate}
+              onUpdateCandidate={handleUpdateCandidate}
+              onDeleteCandidate={handleDeleteCandidate}
+              onRefreshCandidates={refreshAllData}
               onAddVoter={handleAddVoter}
               onUpdateVoter={handleUpdateVoter}
               onDeleteVoter={handleDeleteVoter}
               onResetVoterStatus={handleResetVoterStatus}
               onResetAllVotersToDefault={handleResetAllVotersToDefault}
               onDeleteAllVoters={handleDeleteAllVoters}
+              onRefreshVoters={refreshAllData}
               onSaveSettings={handleSaveSettings}
               onResetAllVotes={handleResetAllVotes}
               onSeedSampleVotes={handleSeedSampleVotes}
@@ -439,7 +503,7 @@ export default function App() {
             votes={allVotes}
             onRefresh={refreshAllData}
             isLoading={isLoadingVotes}
-            onResetVotes={handleResetAllVotes}
+            onResetVotes={session.role === 'admin' ? handleResetAllVotes : undefined}
             isAdmin={session.role === 'admin'}
           />
         )}
@@ -450,8 +514,8 @@ export default function App() {
             votes={allVotes}
             onRefresh={refreshAllData}
             isLoading={isLoadingVotes}
-            onDeleteVote={handleDeleteSingleVote}
-            onResetAllVotes={handleResetAllVotes}
+            onDeleteVote={session.role === 'admin' ? handleDeleteSingleVote : undefined}
+            onResetAllVotes={session.role === 'admin' ? handleResetAllVotes : undefined}
             isAdmin={session.role === 'admin'}
           />
         )}

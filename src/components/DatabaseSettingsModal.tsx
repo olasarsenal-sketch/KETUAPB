@@ -11,7 +11,9 @@ import {
   Server,
   CloudUpload,
   Trash2,
-  HelpCircle
+  HelpCircle,
+  Download,
+  FolderArchive
 } from 'lucide-react';
 import { SupabaseConfig } from '../types';
 import { storageService } from '../services/storageService';
@@ -43,6 +45,57 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
   const [copiedSql, setCopiedSql] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  const [sqlTab, setSqlTab] = useState<'all' | 'voters' | 'candidates' | 'votes'>('all');
+  const [syncingVoters, setSyncingVoters] = useState(false);
+  const [votersSyncFeedback, setVotersSyncFeedback] = useState<string | null>(null);
+
+  const handleSync127Voters = async () => {
+    setSyncingVoters(true);
+    setVotersSyncFeedback(null);
+    try {
+      const res = await storageService.sync127VotersToSupabase();
+      setVotersSyncFeedback(res.message);
+      if (res.success && testResult?.success) {
+        // Re-run test to show updated voter count
+        handleTestConnection();
+      }
+    } catch (err: any) {
+      setVotersSyncFeedback(err.message || 'Gagal sinkronkan 127 siswa ke Supabase.');
+    } finally {
+      setSyncingVoters(false);
+    }
+  };
+
+  const getActiveSQL = () => {
+    if (sqlTab === 'voters') return storageService.getVotersSQLSchema();
+    if (sqlTab === 'candidates') return storageService.getCandidatesSQLSchema();
+    if (sqlTab === 'votes') {
+      const table = tableName || 'badminton_vote';
+      return `-- TABEL SUARA MASUK E-VOTING (1 SISWA = 1 KALI PAKAI)
+CREATE TABLE IF NOT EXISTS public.${table} (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    vote_code TEXT UNIQUE NOT NULL,
+    voter_name TEXT NOT NULL,
+    nisn TEXT NOT NULL,
+    student_class TEXT NOT NULL,
+    candidate_putra_id TEXT NOT NULL,
+    candidate_putra_name TEXT NOT NULL,
+    candidate_putra_number TEXT NOT NULL,
+    candidate_putri_id TEXT NOT NULL,
+    candidate_putri_name TEXT NOT NULL,
+    candidate_putri_number TEXT NOT NULL,
+    user_agent TEXT
+);
+ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Izinkan publik membaca data suara" ON public.${table};
+CREATE POLICY "Izinkan publik membaca data suara" ON public.${table} FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Izinkan publik mengirim suara vote" ON public.${table};
+CREATE POLICY "Izinkan publik mengirim suara vote" ON public.${table} FOR INSERT WITH CHECK (true);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_nisn_unique ON public.${table} (nisn);`;
+    }
+    return storageService.getSQLSchema();
+  };
 
   // In-App Confirm State
   const [confirmModal, setConfirmModal] = useState<{
@@ -86,7 +139,7 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
   };
 
   const handleCopySQL = () => {
-    const sql = storageService.getSQLSchema();
+    const sql = getActiveSQL();
     navigator.clipboard.writeText(sql);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2500);
@@ -175,6 +228,41 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
                   ? 'Setiap nama siswa yang memilih langsung dikirim ke tabel Supabase secara otomatis dan dicadangkan di penyimpanan lokal.'
                   : 'Sistem tetap aman berjalan menggunakan penyimpanan lokal (offline-first). Masukkan URL dan Anon Key Supabase Anda di bawah untuk mengaktifkan cloud database.'}
               </p>
+            </div>
+          </div>
+
+          {/* ZIP Package Download for Hosting */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200/80 space-y-3">
+            <div className="flex items-center gap-2 text-teal-900">
+              <FolderArchive className="w-5 h-5 text-teal-600 shrink-0" />
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider">
+                  Unduh File ZIP Siap Hosting
+                </h4>
+                <p className="text-[11px] text-teal-700 mt-0.5">
+                  Ekstrak atau unggah langsung file ini ke cPanel (folder <code>public_html</code>), Netlify Drop, Vercel, Niagahoster, atau Hostinger tanpa perlu kompilasi.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5 pt-1">
+              <a
+                href="./voting-siap-hosting.zip"
+                download="voting-siap-hosting.zip"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-black shadow-sm transition-all cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Unduh ZIP Siap Hosting (HTML/CSS/JS)</span>
+              </a>
+
+              <a
+                href="./voting-source-code.zip"
+                download="voting-source-code.zip"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-400" />
+                <span>Unduh Source Code (Proyek Lengkap)</span>
+              </a>
             </div>
           </div>
 
@@ -287,9 +375,44 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
             )}
           </div>
 
+          {/* Sync 127 Siswa DPT ke Supabase */}
+          <div className="border border-emerald-200 rounded-2xl p-4 bg-emerald-50/70 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white">
+                    DPT 127 Siswa
+                  </span>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                    Sinkronisasi Data 127 Pemilih Tetap
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-600 mt-1">
+                  Unggah 127 data siswa DPT ke tabel <code className="font-mono font-bold text-emerald-800">voters</code> Supabase dengan proteksi 1 Siswa = 1 Kali Pakai.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSync127Voters}
+                disabled={syncingVoters}
+                className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingVoters ? 'animate-spin' : ''}`} />
+                <span>{syncingVoters ? 'Mengunggah 127 Siswa...' : '🚀 Unggah 127 DPT ke Supabase'}</span>
+              </button>
+            </div>
+
+            {votersSyncFeedback && (
+              <div className="text-xs font-semibold text-emerald-900 bg-emerald-100 p-2.5 rounded-lg border border-emerald-300 animate-in fade-in">
+                {votersSyncFeedback}
+              </div>
+            )}
+          </div>
+
           {/* SQL Schema Generator Box */}
           <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-emerald-600" />
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
@@ -300,7 +423,7 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
               <button
                 type="button"
                 onClick={handleCopySQL}
-                className="text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 {copiedSql ? (
                   <>
@@ -310,18 +433,66 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Salin Script SQL</span>
+                    <span>Salin Script Tab Aktif</span>
                   </>
                 )}
               </button>
             </div>
 
+            {/* SQL Tab Selector */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setSqlTab('all')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                  sqlTab === 'all'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Semua Tabel (Lengkap 3 Tabel)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSqlTab('voters')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                  sqlTab === 'voters'
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Tabel 127 Siswa DPT (voters)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSqlTab('candidates')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                  sqlTab === 'candidates'
+                    ? 'bg-teal-700 text-white'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Tabel Kandidat (candidates)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSqlTab('votes')}
+                className={`py-1.5 px-3 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                  sqlTab === 'votes'
+                    ? 'bg-sky-700 text-white'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Tabel Suara (${tableName})
+              </button>
+            </div>
+
             <p className="text-xs text-slate-600 leading-relaxed">
-              Jalankan script ini di menu <strong>SQL Editor</strong> di dashboard Supabase Anda. Script ini sudah dilengkapi izin pembacaan dan pengiriman suara publik (Row Level Security).
+              Jalankan script ini di menu <strong>SQL Editor</strong> dashboard Supabase. Script sudah memproteksi hak suara 1 Siswa = 1 Kali Pakai dan izin Row Level Security (RLS).
             </p>
 
-            <pre className="p-3 bg-slate-900 text-emerald-300 font-mono text-[11px] rounded-xl overflow-x-auto max-h-36">
-              {storageService.getSQLSchema()}
+            <pre className="p-3 bg-slate-900 text-emerald-300 font-mono text-[11px] rounded-xl overflow-x-auto max-h-48 leading-relaxed select-all">
+              {getActiveSQL()}
             </pre>
           </div>
 

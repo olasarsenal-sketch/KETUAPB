@@ -1,11 +1,9 @@
 import React from 'react';
 import { 
   Check, 
-  Award, 
   Target, 
-  Eye, 
-  Sparkles,
-  Zap
+  ListOrdered,
+  Eye
 } from 'lucide-react';
 import { Candidate } from '../types';
 
@@ -51,8 +49,8 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
         </div>
       </div>
 
-      {/* Candidate Image & Badges */}
-      <div className="relative aspect-4/3 sm:aspect-16/10 bg-slate-100 overflow-hidden">
+      {/* Candidate Image (1:1 Ratio) */}
+      <div className="relative aspect-square w-full bg-slate-100 overflow-hidden">
         <img
           src={candidate.photoUrl}
           alt={candidate.name}
@@ -69,48 +67,51 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
           </div>
         )}
 
-        {/* Quick badge on bottom of photo */}
+        {/* Name and Class on bottom of photo */}
         <div className="absolute bottom-3 left-3 right-3 text-white">
           <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-500/90 text-white mb-1 shadow-sm">
-            {candidate.classGrade}
+            Kelas {candidate.classGrade}
           </span>
           <h3 className="text-lg sm:text-xl font-black text-white leading-tight drop-shadow-md">
             {candidate.name}
           </h3>
-          <p className="text-xs text-emerald-200 font-medium flex items-center gap-1 mt-0.5">
-            <Zap className="w-3 h-3" />
-            {candidate.racketSpecialty}
-          </p>
         </div>
       </div>
 
-      {/* Card Content Body */}
+      {/* Card Content Body: Hanya Visi dan Misi */}
       <div className="p-5 flex-1 flex flex-col justify-between bg-white space-y-4">
-        {/* Motto / Slogan */}
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 italic text-xs text-slate-700 font-medium leading-relaxed relative">
-          <span className="text-emerald-500 font-serif text-lg leading-none mr-1">“</span>
-          {candidate.motto}
-          <span className="text-emerald-500 font-serif text-lg leading-none ml-1">”</span>
-        </div>
-
-        {/* Vision Preview */}
-        <div>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 mb-1">
-            <Target className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Fokus Visi:</span>
+        <div className="space-y-4">
+          {/* Visi */}
+          <div>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 mb-1.5">
+              <Target className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Visi:</span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 font-medium">
+              {candidate.vision}
+            </p>
           </div>
-          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-            {candidate.vision}
-          </p>
-        </div>
 
-        {/* Top Achievement Pill */}
-        {candidate.achievements.length > 0 && (
-          <div className="flex items-start gap-1.5 text-xs text-slate-600 bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-100">
-            <Award className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <span className="font-medium line-clamp-1">{candidate.achievements[0]}</span>
-          </div>
-        )}
+          {/* Misi */}
+          {candidate.missions && candidate.missions.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 mb-1.5">
+                <ListOrdered className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Misi:</span>
+              </div>
+              <ul className="space-y-1.5">
+                {candidate.missions.map((mission, index) => (
+                  <li key={index} className="flex items-start gap-2 text-xs text-slate-700">
+                    <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {index + 1}
+                    </span>
+                    <span className="leading-relaxed font-medium">{mission}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
 
         {/* Actions Button Group */}
         <div className="pt-2 space-y-2 border-t border-slate-100">
@@ -121,7 +122,7 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
             className="w-full py-2 px-3 rounded-lg text-xs font-bold text-slate-600 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 border border-slate-200/80 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Eye className="w-3.5 h-3.5" />
-            Lihat Visi, Misi & Rekam Jejak
+            Lihat Detail Visi & Misi
           </button>
 
           {/* Select Button */}

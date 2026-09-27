@@ -13,7 +13,8 @@ import {
   GraduationCap,
   Info,
   Vote,
-  BarChart3
+  BarChart3,
+  Download
 } from 'lucide-react';
 import { RegisteredVoter, ElectionSettings } from '../../types';
 import { storageService } from '../../services/storageService';
@@ -45,12 +46,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [voterError, setVoterError] = useState<string | null>(null);
 
   // Admin Form State
-  const [adminUsername, setAdminUsername] = useState('admin');
-  const [adminPassword, setAdminPassword] = useState('admin123');
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState<string | null>(null);
 
   // Handle Login Siswa
-  const handleVoterSubmit = (e: React.FormEvent) => {
+  const handleVoterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setVoterError(null);
 
@@ -84,7 +85,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       }
     }
 
-    const res = storageService.loginVoter(
+    const res = await storageService.loginVoterAsync(
       cleanNisn,
       isSelfRegistering ? fullName : undefined,
       isSelfRegistering ? studentClass : undefined,
@@ -108,17 +109,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     if (isValid) {
       onAdminLoginSuccess();
     } else {
-      setAdminError('Username atau kata sandi admin salah. Default: username "admin", password "admin123"');
+      setAdminError('Username atau kata sandi admin salah. Silakan periksa kembali kredensial Anda.');
     }
-  };
-
-  // Quick fill sample voter
-  const fillSampleVoter = (sampleNisn: string, name: string, cls: string) => {
-    setNisn(sampleNisn);
-    setFullName(name);
-    setStudentClass(cls);
-    setIsSelfRegistering(false);
-    setVoterError(null);
   };
 
   return (
@@ -126,35 +118,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       
       {/* Top Banner App Branding */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-lime-400 p-0.5 shadow-xl shadow-emerald-900/30 mb-4">
-          <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center overflow-hidden">
-            {electionSettings.schoolLogoUrl ? (
-              <img src={electionSettings.schoolLogoUrl} alt="Logo Sekolah" className="w-full h-full object-contain p-1.5" />
-            ) : (
-              /* Shuttlecock SVG */
-              <svg 
-                className="w-8 h-8 text-emerald-400 transform -rotate-12" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="5" r="3" fill="currentColor" fillOpacity="0.2" />
-                <path d="M12 8v4" />
-                <path d="m7.5 13 4.5 9 4.5-9" />
-                <path d="M5 13h14" />
-              </svg>
-            )}
+        <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-white border-2 border-emerald-500/40 p-1 shadow-xl shadow-emerald-950/15 mb-4">
+          <div className="w-full h-full bg-white rounded-2xl flex items-center justify-center overflow-hidden">
+            <img 
+              src={electionSettings.schoolLogoUrl || './logo-sman1cikampek.svg'} 
+              alt="Logo Badminton SMAN 1 Cikampek" 
+              className="w-full h-full object-contain p-1" 
+            />
           </div>
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-          {electionSettings.schoolName || 'E-Badminton E-Voting'}
+        <div className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black uppercase tracking-wider mb-2 border border-emerald-300">
+          BADMINTON CLUB
+        </div>
+
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight uppercase">
+          {electionSettings.schoolName || 'SMAN 1 CIKAMPEK'}
         </h1>
-        <p className="text-sm text-slate-500 mt-1 font-medium">
-          {electionSettings.title} ({electionSettings.academicYear})
+        <p className="text-sm text-slate-600 mt-1 font-semibold">
+          {electionSettings.title || 'Pemilihan Ketua & Wakil Ketua'} ({electionSettings.academicYear || '2026/2027'})
         </p>
 
         {/* Voting Status Pill */}
@@ -339,37 +321,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </button>
             </form>
 
-            {/* Quick Test Demo Helpers */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
-              <span className="font-bold text-slate-700 block">
-                💡 Coba Uji Coba Cepat (Akun DPT Siswa 5 Digit):
-              </span>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillSampleVoter('64001', 'Achmad Gilang Ganesha', 'X-A')}
-                  className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:border-emerald-500 hover:text-emerald-700 transition-colors"
-                >
-                  Achmad Gilang (64001 - X-A)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillSampleVoter('63001', 'Cahaya Bintang', 'XI-A')}
-                  className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:border-emerald-500 hover:text-emerald-700 transition-colors"
-                >
-                  Cahaya Bintang (63001 - XI-A)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillSampleVoter('62001', 'Alfatira Milano', 'XII-A')}
-                  className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:border-emerald-500 hover:text-emerald-700 transition-colors"
-                >
-                  Alfatira Milano (62001 - XII-A)
-                </button>
-              </div>
-            </div>
-
-            <div className="text-center">
+            <div className="text-center pt-2">
               <button
                 type="button"
                 onClick={onViewPublicQuickCount}
@@ -416,7 +368,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   required
                   value={adminUsername}
                   onChange={(e) => setAdminUsername(e.target.value)}
-                  placeholder="admin"
+                  placeholder="Masukkan username admin"
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -430,7 +382,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   required
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="admin123"
+                  placeholder="Masukkan kata sandi admin"
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -443,19 +395,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <span>Masuk ke Panel Kontrol Admin</span>
               </button>
             </form>
-
-            {/* Helper default credentials */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-              <span className="font-bold text-slate-800 block">Kredensial Default Panitia:</span>
-              <p>Username: <code className="bg-slate-200 px-1.5 py-0.5 rounded font-mono font-bold text-slate-800">admin</code></p>
-              <p>Kata Sandi: <code className="bg-slate-200 px-1.5 py-0.5 rounded font-mono font-bold text-slate-800">admin123</code></p>
-              <p className="text-[11px] text-slate-400 pt-1">
-                *Kata sandi dapat Anda ubah kapan saja di dalam Panel Admin.
-              </p>
-            </div>
           </div>
         )}
 
+      </div>
+
+      {/* Unduh ZIP Web Siap Hosting Banner */}
+      <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-slate-900/80 backdrop-blur border border-teal-500/30 rounded-2xl text-slate-200 text-xs shadow-lg max-w-xl mx-auto w-full">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 shrink-0">
+            <Download className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-bold text-white text-xs">File Web Siap Hosting (SMAN 1 CIKAMPEK)</p>
+            <p className="text-[11px] text-slate-400">Versi terbaru dengan logo dan nama sekolah resmi.</p>
+          </div>
+        </div>
+
+        <a
+          href="./voting-siap-hosting.zip"
+          download="voting-siap-hosting.zip"
+          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs shadow flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Unduh ZIP Terbaru</span>
+        </a>
       </div>
 
     </div>

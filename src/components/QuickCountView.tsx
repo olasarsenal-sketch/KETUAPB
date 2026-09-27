@@ -87,7 +87,7 @@ export const QuickCountView: React.FC<QuickCountViewProps> = ({
             <span className="text-[11px] text-slate-400 block">Suara Sah Masuk</span>
           </div>
 
-          {onResetVotes && (
+          {isAdmin && onResetVotes && (
             <button
               type="button"
               onClick={() => setConfirmResetModal(true)}
@@ -143,7 +143,7 @@ export const QuickCountView: React.FC<QuickCountViewProps> = ({
                       <img
                         src={candidate.photoUrl}
                         alt={candidate.name}
-                        className="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm shrink-0"
+                        className="w-14 h-14 aspect-square rounded-xl object-cover border-2 border-white shadow-sm shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -155,7 +155,7 @@ export const QuickCountView: React.FC<QuickCountViewProps> = ({
                           </h3>
                         </div>
                         <span className="text-xs text-slate-500 font-medium">
-                          {candidate.classGrade} • {candidate.racketSpecialty}
+                          Kelas {candidate.classGrade}
                         </span>
                       </div>
                       <div className="text-right">
@@ -218,7 +218,7 @@ export const QuickCountView: React.FC<QuickCountViewProps> = ({
                       <img
                         src={candidate.photoUrl}
                         alt={candidate.name}
-                        className="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm shrink-0"
+                        className="w-14 h-14 aspect-square rounded-xl object-cover border-2 border-white shadow-sm shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -230,7 +230,7 @@ export const QuickCountView: React.FC<QuickCountViewProps> = ({
                           </h3>
                         </div>
                         <span className="text-xs text-slate-500 font-medium">
-                          {candidate.classGrade} • {candidate.racketSpecialty}
+                          Kelas {candidate.classGrade}
                         </span>
                       </div>
                       <div className="text-right">

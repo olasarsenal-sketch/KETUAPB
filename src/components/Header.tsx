@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   User,
   Lock,
-  LogOut
+  LogOut,
+  Download
 } from 'lucide-react';
 import { SupabaseConfig, AuthSession } from '../types';
 
@@ -54,27 +55,11 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-lime-400 p-0.5 shadow-md shadow-emerald-900/40">
               <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center overflow-hidden">
-                {schoolLogoUrl ? (
-                  <img src={schoolLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
-                ) : (
-                  /* Shuttlecock SVG Icon */
-                  <svg 
-                    className="w-7 h-7 text-emerald-400 transform -rotate-12 hover:rotate-0 transition-transform" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="5" r="3" fill="currentColor" fillOpacity="0.2" />
-                    <path d="M12 8v4" />
-                    <path d="m7.5 13 4.5 9 4.5-9" />
-                    <path d="M5 13h14" />
-                    <path d="M9 13v3" />
-                    <path d="M15 13v3" />
-                  </svg>
-                )}
+                <img 
+                  src={schoolLogoUrl || './logo-sman1cikampek.svg'} 
+                  alt="Logo Badminton SMAN 1 Cikampek" 
+                  className="w-full h-full object-contain p-0.5 bg-slate-900" 
+                />
               </div>
               <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -85,14 +70,14 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-xl tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-lime-300 bg-clip-text text-transparent uppercase">
-                  E-Badminton
+                  {schoolName || 'SMAN 1 CIKAMPEK'}
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  E-VOTING RESMI
+                  BADMINTON CLUB
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-medium truncate max-w-[200px] sm:max-w-md">
-                {schoolName || 'Pemilihan Ketua & Wakil Ketua Ekstrakurikuler Periode 2026/2027'}
+                E-Voting Pemilihan Ketua & Wakil Ketua Masa Bakti 2026/2027
               </p>
             </div>
           </div>
@@ -175,24 +160,37 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Actions: Session Status & Supabase Settings */}
           <div className="flex items-center gap-2.5">
-            {/* Supabase Status Button */}
-            <button
-              onClick={onOpenSettings}
-              title="Konfigurasi Supabase & Database"
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                supabaseConfig.isConnected
-                  ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/80 shadow-sm'
-                  : 'bg-amber-950/50 border-amber-500/50 text-amber-300 hover:bg-amber-900/70'
-              }`}
+            {/* Download ZIP Button (Selalu Tersedia untuk Mengunduh Versi Terbaru Siap Hosting) */}
+            <a
+              href="./voting-siap-hosting.zip"
+              download="voting-siap-hosting.zip"
+              title="Unduh File ZIP Siap Hosting (SMAN 1 Cikampek - Versi Terbaru)"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-teal-500/70 bg-teal-900/70 hover:bg-teal-800 text-teal-200 text-xs font-bold transition-all shadow-sm cursor-pointer"
             >
-              <Database className="w-3.5 h-3.5" />
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${supabaseConfig.isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-                <span className="hidden lg:inline">
-                  {supabaseConfig.isConnected ? 'Supabase' : 'DB Lokal'}
-                </span>
-              </div>
-            </button>
+              <Download className="w-3.5 h-3.5 text-teal-300" />
+              <span>Unduh ZIP</span>
+            </a>
+
+            {/* Supabase Status Button (Khusus Admin) */}
+            {session.role === 'admin' && (
+              <button
+                onClick={onOpenSettings}
+                title="Konfigurasi Supabase & Database"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  supabaseConfig.isConnected
+                    ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/80 shadow-sm'
+                    : 'bg-amber-950/50 border-amber-500/50 text-amber-300 hover:bg-amber-900/70'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${supabaseConfig.isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                  <span className="hidden lg:inline">
+                    {supabaseConfig.isConnected ? 'Supabase' : 'DB Lokal'}
+                  </span>
+                </div>
+              </button>
+            )}
 
             {/* Session Pill / Logout Button */}
             {session.role === 'admin' && (

@@ -5,9 +5,9 @@
 
 export const compressImageFile = (
   file: File, 
-  maxWidth = 640, 
-  maxHeight = 640, 
-  quality = 0.82
+  maxWidth = 800, 
+  maxHeight = 800, 
+  quality = 0.85
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
@@ -24,7 +24,7 @@ export const compressImageFile = (
         let width = img.width;
         let height = img.height;
 
-        // Hitung skala rasio agar tidak melebihi maxWidth & maxHeight
+        // Hitung skala rasio agar tidak melebihi maxWidth & maxHeight dengan menjaga rasio asli
         if (width > height) {
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
@@ -43,17 +43,15 @@ export const compressImageFile = (
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          // Fallback ke string asli jika canvas tidak tersedia
           resolve(readerEvent.target?.result as string);
           return;
         }
 
-        // Gambar ke canvas dengan smoothing berkualitas
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert ke format JPEG/WEBP terkompresi
+        // Convert ke format JPEG terkompresi dengan kualitas tinggi untuk layar retina HP
         const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
         resolve(compressedDataUrl);
       };

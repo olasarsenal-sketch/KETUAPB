@@ -108,7 +108,7 @@ export const ReviewConfirmModal: React.FC<ReviewConfirmModalProps> = ({
                 <img
                   src={selectedPutra?.photoUrl}
                   alt={selectedPutra?.name}
-                  className="w-16 h-16 rounded-xl object-cover border border-emerald-300 shadow-sm shrink-0"
+                  className="w-16 h-16 aspect-square rounded-xl object-cover border border-emerald-300 shadow-sm shrink-0"
                 />
                 <div>
                   <div className="flex items-center gap-1.5 mb-0.5">
@@ -123,7 +123,7 @@ export const ReviewConfirmModal: React.FC<ReviewConfirmModalProps> = ({
                     {selectedPutra?.name}
                   </h4>
                   <p className="text-xs text-slate-600 font-medium mt-0.5">
-                    {selectedPutra?.classGrade} • {selectedPutra?.racketSpecialty}
+                    Kelas {selectedPutra?.classGrade}
                   </p>
                 </div>
               </div>
@@ -133,7 +133,7 @@ export const ReviewConfirmModal: React.FC<ReviewConfirmModalProps> = ({
                 <img
                   src={selectedPutri?.photoUrl}
                   alt={selectedPutri?.name}
-                  className="w-16 h-16 rounded-xl object-cover border border-emerald-300 shadow-sm shrink-0"
+                  className="w-16 h-16 aspect-square rounded-xl object-cover border border-emerald-300 shadow-sm shrink-0"
                 />
                 <div>
                   <div className="flex items-center gap-1.5 mb-0.5">
@@ -148,7 +148,7 @@ export const ReviewConfirmModal: React.FC<ReviewConfirmModalProps> = ({
                     {selectedPutri?.name}
                   </h4>
                   <p className="text-xs text-slate-600 font-medium mt-0.5">
-                    {selectedPutri?.classGrade} • {selectedPutri?.racketSpecialty}
+                    Kelas {selectedPutri?.classGrade}
                   </p>
                 </div>
               </div>

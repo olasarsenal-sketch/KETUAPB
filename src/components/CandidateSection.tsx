@@ -142,7 +142,7 @@ export const CandidateSection: React.FC<CandidateSectionProps> = ({
               Pilih 1 Kandidat Ketua Putra
             </h2>
             <p className="text-slate-300 text-sm mt-1 max-w-3xl">
-              Silakan pelajari visi, misi, dan keunggulan raket dari setiap kandidat di bawah ini. Klik "Pilih Calon" pada kandidat pilihan Anda. Tampilan dijamin bersih tanpa popup yang mengganggu.
+              Silakan pelajari visi dan misi dari setiap kandidat di bawah ini. Klik "Pilih Calon" pada kandidat pilihan Anda. Tampilan dijamin bersih tanpa popup yang mengganggu.
             </p>
           </div>
 

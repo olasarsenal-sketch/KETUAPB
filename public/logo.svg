@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <!-- Background Badge -->
+  <rect width="500" height="500" rx="30" fill="#f8fafc" />
+  
+  <g fill="#0f172a" stroke="#0f172a">
+    <!-- Circular Brushstroke Outer Ring -->
+    <path d="M 250,55 
+             C 335,55 410,115 428,198 
+             C 445,280 395,365 315,398 
+             C 275,415 220,412 180,395
+             C 135,376 95,335 78,288
+             C 60,238 72,180 108,138
+             C 142,98 195,68 248,56
+             C 255,54 260,54 265,55" 
+          fill="none" stroke="#0f172a" stroke-width="15" stroke-linecap="round" stroke-dasharray="14 4 28 8" opacity="0.95" />
+    
+    <path d="M 235,68
+             C 310,72 380,125 395,198
+             C 410,270 365,348 295,378
+             C 240,400 170,390 120,345
+             C 85,310 75,255 88,205
+             C 100,158 140,110 188,85"
+          fill="none" stroke="#0f172a" stroke-width="6" stroke-linecap="round" opacity="0.8" />
+
+    <!-- Shuttlecock in Flight -->
+    <g transform="translate(258, 142) scale(0.95)">
+      <!-- Cork base -->
+      <ellipse cx="6" cy="18" rx="4.5" ry="4" fill="#0f172a" />
+      <!-- Feathers -->
+      <polygon points="6,15 15,2 2,5" fill="#0f172a" />
+      <polygon points="6,15 12,0 -1,2" fill="#0f172a" />
+      <polygon points="6,15 8,-3 -4,0" fill="#0f172a" />
+    </g>
+
+    <!-- Badminton Player Silhouette Jumping Smash -->
+    <!-- Head -->
+    <circle cx="232" cy="188" r="16" fill="#0f172a" />
+    
+    <!-- Torso / Jersey -->
+    <path d="M 224,204 
+             L 248,206 
+             L 272,228 
+             L 260,240 
+             L 248,232
+             L 246,275 
+             L 218,272 
+             L 208,228 
+             Z" fill="#0f172a" />
+
+    <!-- Left Arm & Racket (raised high for smash) -->
+    <path d="M 216,212 
+             L 204,188 
+             L 194,162 
+             L 204,158 
+             L 214,184 
+             Z" fill="#0f172a" />
+    <!-- Hand grip -->
+    <circle cx="192" cy="158" r="4.5" fill="#0f172a" />
+    <!-- Racket Shaft -->
+    <line x1="192" y1="158" x2="218" y2="108" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+    <!-- Racket Head -->
+    <ellipse cx="225" cy="98" rx="14" ry="18" fill="none" stroke="#0f172a" stroke-width="3.5" transform="rotate(24 225 98)" />
+    <!-- Racket Strings grid -->
+    <line x1="220" y1="84" x2="230" y2="112" stroke="#0f172a" stroke-width="1" opacity="0.6" />
+    <line x1="213" y1="94" x2="237" y2="102" stroke="#0f172a" stroke-width="1" opacity="0.6" />
+
+    <!-- Right Arm (Balance in air) -->
+    <path d="M 248,212 
+             L 282,225 
+             L 316,224 
+             L 325,228 
+             L 315,234 
+             L 280,233 
+             Z" fill="#0f172a" />
+
+    <!-- Shorts / Legs jumping scissor kick -->
+    <!-- Shorts -->
+    <path d="M 218,272 L 246,275 L 248,295 L 210,292 Z" fill="#0f172a" />
+    
+    <!-- Left Leg (tucked back) -->
+    <path d="M 215,290 
+             L 192,308 
+             L 178,326 
+             L 190,332 
+             L 205,314 
+             L 225,292 Z" fill="#0f172a" />
+    <!-- Left Shoe -->
+    <path d="M 178,326 L 165,338 L 180,344 L 192,332 Z" fill="#0f172a" />
+
+    <!-- Right Leg (driving forward / scissor kick) -->
+    <path d="M 240,292 
+             L 252,324 
+             L 242,358 
+             L 225,355 
+             L 236,325 
+             L 230,292 Z" fill="#0f172a" />
+    <!-- Right Shoe -->
+    <path d="M 242,358 L 222,374 L 215,364 L 228,354 Z" fill="#0f172a" />
+  </g>
+
+  <!-- TYPOGRAPHY BADMINTON CLUB SMAN 1 CIKAMPEK -->
+  <!-- "BADMINTON" with Shuttlecock 'A' -->
+  <g transform="translate(0, 420)">
+    <!-- B -->
+    <path d="M 132,0 L 148,0 C 158,0 164,4 164,11 C 164,16 160,19 154,20 C 161,21 166,25 166,32 C 166,40 159,44 148,44 L 132,44 Z M 141,8 L 141,18 L 148,18 C 152,18 155,16 155,13 C 155,10 152,8 148,8 Z M 141,25 L 141,36 L 149,36 C 154,36 157,34 157,30 C 157,27 154,25 149,25 Z" fill="#0f172a" />
+
+    <!-- Shuttlecock A -->
+    <g transform="translate(170, 0)">
+      <polygon points="18,12 28,44 8,44" fill="#0f172a" />
+      <polygon points="18,15 12,38 24,38" fill="#f8fafc" />
+      <!-- Shuttlecock cork base -->
+      <ellipse cx="18" cy="8" rx="6" ry="6" fill="#0f172a" />
+      <!-- Skirt lines -->
+      <line x1="14" y1="22" x2="22" y2="22" stroke="#f8fafc" stroke-width="2" />
+      <line x1="12" y1="30" x2="24" y2="30" stroke="#f8fafc" stroke-width="2" />
+    </g>
+
+    <!-- D -->
+    <path d="M 206,0 L 222,0 C 235,0 244,9 244,22 C 244,35 235,44 222,44 L 206,44 Z M 215,8 L 215,36 L 222,36 C 230,36 235,30 235,22 C 235,14 230,8 222,8 Z" fill="#0f172a" />
+
+    <!-- M -->
+    <path d="M 252,0 L 261,0 L 273,26 L 285,0 L 294,0 L 294,44 L 286,44 L 286,14 L 276,36 L 270,36 L 260,14 L 260,44 L 252,44 Z" fill="#0f172a" />
+
+    <!-- I -->
+    <path d="M 302,0 L 311,0 L 311,44 L 302,44 Z" fill="#0f172a" />
+
+    <!-- N -->
+    <path d="M 319,0 L 328,0 L 344,28 L 344,0 L 353,0 L 353,44 L 344,44 L 328,16 L 328,44 L 319,44 Z" fill="#0f172a" />
+
+    <!-- T -->
+    <path d="M 359,0 L 383,0 L 383,8 L 375,8 L 375,44 L 367,44 L 367,8 L 359,8 Z" fill="#0f172a" />
+
+    <!-- O -->
+    <path d="M 387,22 C 387,9 397,0 410,0 C 423,0 433,9 433,22 C 433,35 423,44 410,44 C 397,44 387,35 387,22 Z M 396,22 C 396,31 402,36 410,36 C 418,36 424,31 424,22 C 424,13 418,8 410,8 C 402,8 396,13 396,22 Z" fill="#0f172a" />
+
+    <!-- N -->
+    <path d="M 440,0 L 449,0 L 465,28 L 465,0 L 474,0 L 474,44 L 465,44 L 449,16 L 449,44 L 440,44 Z" fill="#0f172a" />
+  </g>
+
+  <!-- — CLUB — -->
+  <g transform="translate(0, 442)">
+    <line x1="165" y1="10" x2="215" y2="10" stroke="#0f172a" stroke-width="2.5" />
+    <text x="250" y="15" font-family="'Outfit', 'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="900" letter-spacing="6" fill="#0f172a" text-anchor="middle">
+      CLUB
+    </text>
+    <line x1="285" y1="10" x2="335" y2="10" stroke="#0f172a" stroke-width="2.5" />
+  </g>
+
+  <!-- SMAN 1 CIKAMPEK -->
+  <text x="250" y="478" font-family="'Outfit', 'Plus Jakarta Sans', sans-serif" font-size="18" font-weight="900" letter-spacing="4" fill="#0f172a" text-anchor="middle">
+    SMAN 1 CIKAMPEK
+  </text>
+</svg>

@@ -54,12 +54,12 @@ export const VotingSuccessReceipt: React.FC<VotingSuccessReceiptProps> = ({
         <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-900 text-white p-6 sm:p-8 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 transform translate-x-6 -translate-y-6 w-32 h-32 bg-emerald-400/20 rounded-full blur-xl pointer-events-none"></div>
           
-          <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center mx-auto mb-3 text-white backdrop-blur-sm shadow-md animate-in zoom-in-75 overflow-hidden">
-            {schoolLogoUrl ? (
-              <img src={schoolLogoUrl} alt="Logo" className="w-full h-full object-contain p-1.5" />
-            ) : (
-              <CheckCircle2 className="w-10 h-10" />
-            )}
+          <div className="w-16 h-16 rounded-2xl bg-white border-2 border-white/60 flex items-center justify-center mx-auto mb-3 shadow-md animate-in zoom-in-75 overflow-hidden p-1">
+            <img 
+              src={schoolLogoUrl || './logo-sman1cikampek.svg'} 
+              alt="Logo SMAN 1 Cikampek" 
+              className="w-full h-full object-contain" 
+            />
           </div>
 
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-400/20 border border-emerald-400/40 text-emerald-200 text-xs font-bold uppercase tracking-wider mb-2">
@@ -70,8 +70,8 @@ export const VotingSuccessReceipt: React.FC<VotingSuccessReceiptProps> = ({
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             BUKTI RESMI E-VOTING BADMINTON
           </h2>
-          <p className="text-emerald-100 text-xs sm:text-sm mt-1">
-            {schoolName || 'Ekstrakurikuler Bulutangkis SMA - Masa Bakti 2026/2027'}
+          <p className="text-emerald-100 text-xs sm:text-sm mt-1 font-bold">
+            {schoolName || 'SMAN 1 CIKAMPEK'} - Masa Bakti 2026/2027
           </p>
         </div>
 

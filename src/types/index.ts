@@ -6,11 +6,11 @@ export interface Candidate {
   nickname: string;
   classGrade: string;
   photoUrl: string;
-  motto: string;
+  motto?: string;
   vision: string;
   missions: string[];
-  achievements: string[];
-  racketSpecialty: string; // e.g. "Tunggal Putra / Smash Power", "Ganda Campuran / Playmaker"
+  achievements?: string[];
+  racketSpecialty?: string;
 }
 
 export interface VoterInfo {

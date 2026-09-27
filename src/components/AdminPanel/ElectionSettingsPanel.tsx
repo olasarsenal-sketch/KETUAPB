@@ -39,8 +39,8 @@ export const ElectionSettingsPanel: React.FC<ElectionSettingsPanelProps> = ({
   const [isVotingOpen, setIsVotingOpen] = useState(settings.isVotingOpen);
   const [title, setTitle] = useState(settings.title);
   const [academicYear, setAcademicYear] = useState(settings.academicYear);
-  const [schoolName, setSchoolName] = useState(settings.schoolName || 'SMA Negeri 1 Bulutangkis');
-  const [schoolLogoUrl, setSchoolLogoUrl] = useState(settings.schoolLogoUrl || '');
+  const [schoolName, setSchoolName] = useState(settings.schoolName || 'SMAN 1 CIKAMPEK');
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState(settings.schoolLogoUrl || './logo-sman1cikampek.svg');
   const [allowSelfRegistration, setAllowSelfRegistration] = useState(settings.allowSelfRegistration);
   const [closedMessage, setClosedMessage] = useState(settings.closedMessage);
   
@@ -266,7 +266,7 @@ export const ElectionSettingsPanel: React.FC<ElectionSettingsPanelProps> = ({
                   required
                   value={schoolName}
                   onChange={(e) => setSchoolName(e.target.value)}
-                  placeholder="Contoh: SMA Negeri 1 Bulutangkis"
+                  placeholder="Contoh: SMAN 1 CIKAMPEK"
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">

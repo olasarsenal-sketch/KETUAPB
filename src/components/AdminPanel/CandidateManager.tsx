@@ -16,16 +16,25 @@ import {
   Upload,
   Camera,
   Link as LinkIcon,
-  AlertCircle
+  AlertCircle,
+  Database,
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 import { Candidate } from '../../types';
 import { compressImageFile } from '../../utils/imageUtils';
 import { ConfirmModal } from '../Common/ConfirmModal';
+import { storageService } from '../../services/storageService';
 
 interface CandidateManagerProps {
   candidates: Candidate[];
-  onSaveCandidates: (candidates: Candidate[]) => void;
-  onResetCandidates: () => void;
+  onSaveCandidates: (candidates: Candidate[]) => void | Promise<void>;
+  onResetCandidates: () => void | Promise<void>;
+  onAddCandidate?: (candidate: Candidate) => Promise<{ success: boolean; message: string }>;
+  onUpdateCandidate?: (candidate: Candidate) => Promise<{ success: boolean; message: string }>;
+  onDeleteCandidate?: (id: string) => Promise<{ success: boolean; message: string }>;
+  onRefreshCandidates?: () => Promise<void>;
+  isSupabaseConnected?: boolean;
 }
 
 const PRESET_BADMINTON_AVATARS = [
@@ -43,9 +52,17 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
   candidates,
   onSaveCandidates,
   onResetCandidates,
+  onAddCandidate,
+  onUpdateCandidate,
+  onDeleteCandidate,
+  onRefreshCandidates,
+  isSupabaseConnected = true,
 }) => {
   const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterCategory, setFilterCategory] = useState<'all' | 'putra' | 'putri'>('all');
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -97,11 +114,11 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
     setClassGrade('XI MIPA 1');
     setPhotoUrl(cat === 'putra' ? PRESET_BADMINTON_AVATARS[0].url : PRESET_BADMINTON_AVATARS[4].url);
     setPhotoUploadSource('upload');
-    setMotto('Bermain sportif, memimpin aktif!');
-    setRacketSpecialty('Tunggal & Ganda / Rally & Serangan Cepat');
+    setMotto('');
+    setRacketSpecialty('');
     setVision('Mewujudkan ekstrakurikuler bulutangkis yang berprestasi dan solid.');
     setMissionsText('Latihan rutin 2 kali seminggu\nTurnamen internal antar kelas\nPerawatan fasilitas raket dan shuttlecock');
-    setAchievementsText('Juara O2SN Tingkat Sekolah\nAnggota aktif bulutangkis');
+    setAchievementsText('');
     setIsModalOpen(true);
   };
 
@@ -114,11 +131,11 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
     setClassGrade(c.classGrade);
     setPhotoUrl(c.photoUrl);
     setPhotoUploadSource('upload');
-    setMotto(c.motto);
-    setRacketSpecialty(c.racketSpecialty);
-    setVision(c.vision);
-    setMissionsText(c.missions.join('\n'));
-    setAchievementsText(c.achievements.join('\n'));
+    setMotto(c.motto || '');
+    setRacketSpecialty(c.racketSpecialty || '');
+    setVision(c.vision || '');
+    setMissionsText(c.missions ? c.missions.join('\n') : '');
+    setAchievementsText('');
     setIsModalOpen(true);
   };
 
@@ -141,11 +158,31 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
     }
   };
 
-  const handleSaveModal = (e: React.FormEvent) => {
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(storageService.getCandidatesSQLSchema());
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2500);
+    showToast('success', 'Script SQL tabel candidates berhasil disalin ke clipboard!');
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (onRefreshCandidates) {
+        await onRefreshCandidates();
+      }
+      showToast('success', 'Data kandidat berhasil disinkronkan dari Supabase.');
+    } catch {
+      showToast('error', 'Gagal menyegarkan data.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanMissions = missionsText.split('\n').map(s => s.trim()).filter(Boolean);
-    const cleanAchievements = achievementsText.split('\n').map(s => s.trim()).filter(Boolean);
 
     if (editingCandidate) {
       // Update
@@ -157,14 +194,20 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
         nickname: nickname.trim() || name.trim().split(' ')[0],
         classGrade: classGrade.trim(),
         photoUrl: photoUrl.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-        motto: motto.trim(),
-        racketSpecialty: racketSpecialty.trim(),
+        motto: '',
+        racketSpecialty: '',
         vision: vision.trim(),
-        missions: cleanMissions.length > 0 ? cleanMissions : ['Menyelenggarakan latihan berkualitas'],
-        achievements: cleanAchievements.length > 0 ? cleanAchievements : ['Atlet bulutangkis sekolah'],
+        missions: cleanMissions.length > 0 ? cleanMissions : ['Menyelenggarakan kegiatan dan latihan berkualitas'],
+        achievements: [],
       };
-      onSaveCandidates(candidates.map(c => c.id === updated.id ? updated : c));
-      showToast('success', `Data kandidat "${updated.name}" berhasil diperbarui!`);
+
+      if (onUpdateCandidate) {
+        const res = await onUpdateCandidate(updated);
+        showToast(res.success ? 'success' : 'error', res.message);
+      } else {
+        await onSaveCandidates(candidates.map(c => c.id === updated.id ? updated : c));
+        showToast('success', `Data kandidat "${updated.name}" berhasil diperbarui!`);
+      }
     } else {
       // Add
       const newCand: Candidate = {
@@ -175,14 +218,20 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
         nickname: nickname.trim() || name.trim().split(' ')[0],
         classGrade: classGrade.trim(),
         photoUrl: photoUrl.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-        motto: motto.trim(),
-        racketSpecialty: racketSpecialty.trim(),
+        motto: '',
+        racketSpecialty: '',
         vision: vision.trim(),
-        missions: cleanMissions.length > 0 ? cleanMissions : ['Menyelenggarakan latihan berkualitas'],
-        achievements: cleanAchievements.length > 0 ? cleanAchievements : ['Atlet bulutangkis sekolah'],
+        missions: cleanMissions.length > 0 ? cleanMissions : ['Menyelenggarakan kegiatan dan latihan berkualitas'],
+        achievements: [],
       };
-      onSaveCandidates([...candidates, newCand]);
-      showToast('success', `Kandidat baru "${newCand.name}" berhasil ditambahkan!`);
+
+      if (onAddCandidate) {
+        const res = await onAddCandidate(newCand);
+        showToast(res.success ? 'success' : 'error', res.message);
+      } else {
+        await onSaveCandidates([...candidates, newCand]);
+        showToast('success', `Kandidat baru "${newCand.name}" berhasil ditambahkan!`);
+      }
     }
 
     setIsModalOpen(false);
@@ -192,13 +241,18 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
     setConfirmModal({
       isOpen: true,
       title: `Hapus Kandidat "${candName}"?`,
-      message: `Yakin ingin menghapus kandidat "${candName}" dari daftar calon pemilihan?`,
+      message: `Yakin ingin menghapus kandidat "${candName}" dari daftar calon pemilihan? Data akan dihapus dari Supabase.`,
       confirmLabel: 'Ya, Hapus Kandidat',
       variant: 'danger',
       iconType: 'trash',
-      onConfirm: () => {
-        onSaveCandidates(candidates.filter(c => c.id !== id));
-        showToast('success', `Kandidat "${candName}" berhasil dihapus.`);
+      onConfirm: async () => {
+        if (onDeleteCandidate) {
+          const res = await onDeleteCandidate(id);
+          showToast(res.success ? 'success' : 'error', res.message);
+        } else {
+          await onSaveCandidates(candidates.filter(c => c.id !== id));
+          showToast('success', `Kandidat "${candName}" berhasil dihapus.`);
+        }
         setConfirmModal(null);
       },
     });
@@ -208,12 +262,12 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
     setConfirmModal({
       isOpen: true,
       title: 'Kembalikan Kandidat ke Default?',
-      message: 'Yakin ingin mereset seluruh daftar kandidat kembali ke susunan calon awal resmi (3 Putra & 3 Putri)?',
+      message: 'Yakin ingin mereset seluruh daftar kandidat kembali ke susunan calon awal resmi SMAN 1 Cikampek (3 Putra & 3 Putri)?',
       confirmLabel: 'Ya, Kembalikan Default',
       variant: 'warning',
       iconType: 'reset',
-      onConfirm: () => {
-        onResetCandidates();
+      onConfirm: async () => {
+        await onResetCandidates();
         showToast('success', 'Daftar kandidat berhasil dikembalikan ke default resmi!');
         setConfirmModal(null);
       },
@@ -276,6 +330,27 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
 
           <button
             type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="py-2.5 px-3 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Muat ulang data kandidat dari Supabase"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-600' : ''}`} />
+            <span className="hidden sm:inline">Sinkron Supabase</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSqlModalOpen(true)}
+            className="py-2.5 px-3.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            title="Lihat Script SQL untuk tabel candidates di Supabase"
+          >
+            <Database className="w-3.5 h-3.5 text-blue-600" />
+            <span>Script SQL Kandidat</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleReset}
             className="py-2.5 px-3 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Kembalikan ke data kandidat default"
@@ -332,8 +407,8 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
             key={candidate.id}
             className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
           >
-            {/* Image Header with Number Tag */}
-            <div className="relative aspect-16/10 bg-slate-100 overflow-hidden group">
+            {/* Image Header with Number Tag (1:1 Square) */}
+            <div className="relative aspect-square w-full bg-slate-100 overflow-hidden group">
               <img
                 src={candidate.photoUrl}
                 alt={candidate.name}
@@ -359,22 +434,34 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
                   {candidate.name}
                 </h3>
                 <p className="text-xs text-emerald-300 font-semibold mt-0.5">
-                  Kelas {candidate.classGrade} • {candidate.racketSpecialty}
+                  Kelas {candidate.classGrade}
                 </p>
               </div>
             </div>
 
-            {/* Content Body */}
+            {/* Content Body: Visi dan Misi */}
             <div className="p-4 space-y-3 flex-1 flex flex-col justify-between text-xs text-slate-700">
-              <div className="italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-slate-600 line-clamp-2">
-                "{candidate.motto}"
-              </div>
+              <div className="space-y-2.5">
+                <div>
+                  <span className="font-bold text-slate-900 block mb-0.5">Visi:</span>
+                  <p className="text-slate-600 line-clamp-2 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    {candidate.vision}
+                  </p>
+                </div>
 
-              <div>
-                <span className="font-bold text-slate-900 block mb-0.5">Visi Utama:</span>
-                <p className="text-slate-600 line-clamp-2 leading-relaxed">
-                  {candidate.vision}
-                </p>
+                {candidate.missions && candidate.missions.length > 0 && (
+                  <div>
+                    <span className="font-bold text-slate-900 block mb-1">Misi:</span>
+                    <ul className="text-slate-600 space-y-1">
+                      {candidate.missions.slice(0, 3).map((m, idx) => (
+                        <li key={idx} className="line-clamp-1 flex items-start gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1"></span>
+                          <span>{m}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -633,47 +720,18 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
                 </div>
               </div>
 
-              {/* Kelas & Spesialisasi Raket */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-black uppercase tracking-wider text-slate-700 mb-1">
-                    Kelas & Jurusan <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={classGrade}
-                    onChange={(e) => setClassGrade(e.target.value)}
-                    placeholder="Contoh: XI MIPA 2"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-black uppercase tracking-wider text-slate-700 mb-1">
-                    Spesialisasi Raket / Gaya Main
-                  </label>
-                  <input
-                    type="text"
-                    value={racketSpecialty}
-                    onChange={(e) => setRacketSpecialty(e.target.value)}
-                    placeholder="Contoh: Tunggal Putra / Smash Power & Netting"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              {/* Motto */}
+              {/* Kelas & Jurusan */}
               <div>
                 <label className="block font-black uppercase tracking-wider text-slate-700 mb-1">
-                  Motto / Slogan Kampanye
+                  Kelas & Jurusan <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={motto}
-                  onChange={(e) => setMotto(e.target.value)}
-                  placeholder="Contoh: Bermain dengan Jiwa Sportif, Memimpin dengan Nyata!"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                  value={classGrade}
+                  onChange={(e) => setClassGrade(e.target.value)}
+                  placeholder="Contoh: XI MIPA 2"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
@@ -692,30 +750,16 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
                 />
               </div>
 
-              {/* Misi (Pisahkan per baris) */}
+              {/* Misi */}
               <div>
                 <label className="block font-black uppercase tracking-wider text-slate-700 mb-1">
-                  Misi & Program Kerja Unggulan (Satu per baris)
+                  Misi & Program Kerja
                 </label>
                 <textarea
                   rows={3}
                   value={missionsText}
                   onChange={(e) => setMissionsText(e.target.value)}
                   placeholder="Program latihan fisik rutin&#10;Turnamen bulutangkis internal&#10;Sparing antar sekolah"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Prestasi (Pisahkan per baris) */}
-              <div>
-                <label className="block font-black uppercase tracking-wider text-slate-700 mb-1">
-                  Prestasi & Rekam Jejak Bulutangkis (Satu per baris)
-                </label>
-                <textarea
-                  rows={2}
-                  value={achievementsText}
-                  onChange={(e) => setAchievementsText(e.target.value)}
-                  placeholder="Juara 1 O2SN Bulutangkis Kota&#10;Kapten Tim Beregu Sekolah"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -739,6 +783,65 @@ export const CandidateManager: React.FC<CandidateManagerProps> = ({
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SCRIPT SQL KANDIDAT SUPABASE */}
+      {isSqlModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Script SQL Tabel Kandidat Supabase</h3>
+                  <p className="text-xs text-slate-500">Jalankan di menu SQL Editor di Supabase untuk sinkronisasi kandidat antar-perangkat</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSqlModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4">
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed">
+                <strong>💡 Cara Pakai:</strong> Buka dashboard Supabase Anda → klik <strong>SQL Editor</strong> di bilah kiri → klik <strong>New Query</strong> → tempelkan script di bawah → klik tombol hijau <strong>Run</strong>. Semua data calon (termasuk foto & visi-misi) akan tersinkronkan otomatis!
+              </div>
+
+              <div className="relative">
+                <div className="flex items-center justify-between pb-2">
+                  <span className="text-xs font-bold text-slate-700">Script SQL Table `public.candidates`:</span>
+                  <button
+                    type="button"
+                    onClick={handleCopySql}
+                    className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  >
+                    {copiedSql ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSql ? 'Tersalin!' : 'Salin Script SQL'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 bg-slate-900 text-emerald-300 font-mono text-xs rounded-2xl overflow-x-auto max-h-72 select-all leading-relaxed">
+                  {storageService.getCandidatesSQLSchema()}
+                </pre>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsSqlModalOpen(false)}
+                className="py-2.5 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

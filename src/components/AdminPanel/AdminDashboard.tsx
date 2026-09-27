@@ -28,14 +28,20 @@ interface AdminDashboardProps {
   settings: ElectionSettings;
   votes: VoteRecord[];
   supabaseConfig: SupabaseConfig;
-  onSaveCandidates: (candidates: Candidate[]) => void;
-  onResetCandidates: () => void;
+  onSaveCandidates: (candidates: Candidate[]) => void | Promise<void>;
+  onResetCandidates: () => void | Promise<void>;
+  onAddCandidate?: (candidate: Candidate) => Promise<{ success: boolean; message: string }>;
+  onUpdateCandidate?: (candidate: Candidate) => Promise<{ success: boolean; message: string }>;
+  onDeleteCandidate?: (id: string) => Promise<{ success: boolean; message: string }>;
+  onRefreshCandidates?: () => Promise<void>;
   onAddVoter: (voter: Omit<RegisteredVoter, 'id' | 'hasVoted'>) => void;
   onUpdateVoter: (voter: RegisteredVoter) => void;
   onDeleteVoter: (id: string) => void;
   onResetVoterStatus: (nisn: string) => void;
   onResetAllVotersToDefault?: () => void;
   onDeleteAllVoters?: () => void;
+  onRefreshVoters?: () => Promise<void>;
+  onSync127VotersToSupabase?: () => Promise<{ success: boolean; count: number; message: string }>;
   onSaveSettings: (settings: ElectionSettings) => void;
   onResetAllVotes: () => void;
   onSeedSampleVotes?: () => void;
@@ -51,12 +57,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   supabaseConfig,
   onSaveCandidates,
   onResetCandidates,
+  onAddCandidate,
+  onUpdateCandidate,
+  onDeleteCandidate,
+  onRefreshCandidates,
   onAddVoter,
   onUpdateVoter,
   onDeleteVoter,
   onResetVoterStatus,
   onResetAllVotersToDefault,
   onDeleteAllVoters,
+  onRefreshVoters,
   onSaveSettings,
   onResetAllVotes,
   onSeedSampleVotes,
@@ -331,6 +342,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           candidates={candidates}
           onSaveCandidates={onSaveCandidates}
           onResetCandidates={onResetCandidates}
+          onAddCandidate={onAddCandidate}
+          onUpdateCandidate={onUpdateCandidate}
+          onDeleteCandidate={onDeleteCandidate}
+          onRefreshCandidates={onRefreshCandidates}
+          isSupabaseConnected={supabaseConfig.isConnected}
         />
       )}
 
@@ -344,6 +360,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onResetVoterStatus={onResetVoterStatus}
           onResetAllVotersToDefault={onResetAllVotersToDefault}
           onDeleteAllVoters={onDeleteAllVoters}
+          onRefreshVoters={onRefreshVoters}
+          isSupabaseConnected={supabaseConfig.isConnected}
         />
       )}
 

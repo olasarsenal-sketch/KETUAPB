@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { INITIAL_CANDIDATES } from '../data/initialCandidates';
 import { OFFICIAL_REGISTERED_VOTERS } from '../data/studentVoters';
+import { VOTERS_127_SQL_SCHEMA } from '../data/votersSQL';
 
 const STORAGE_KEYS = {
   VOTES: 'ebadminton_votes_v2',
@@ -30,10 +31,10 @@ const DEFAULT_TABLE_NAME = 'badminton_vote';
 
 const DEFAULT_ELECTION_SETTINGS: ElectionSettings = {
   isVotingOpen: true,
-  title: 'Pemilihan Ketua & Wakil Ketua Ekstrakurikuler Bulutangkis',
+  title: 'Pemilihan Ketua & Wakil Ketua Badminton Club',
   academicYear: '2026/2027',
-  schoolName: 'SMA Negeri 1 Bulutangkis',
-  schoolLogoUrl: '',
+  schoolName: 'SMAN 1 CIKAMPEK',
+  schoolLogoUrl: './logo-sman1cikampek.svg',
   allowSelfRegistration: true, // Pemilih baru dapat langsung mengisi identitas saat login
   closedMessage: 'Pemungutan suara resmi telah ditutup oleh panitia pemilihan. Terima kasih atas partisipasi Anda.',
 };
@@ -290,9 +291,26 @@ class StorageService {
         };
       }
 
+      let candidatesInfo = '';
+      let votersInfo = '';
+
+      try {
+        const cTest = await client.from('candidates').select('id', { count: 'exact', head: true });
+        if (!cTest.error) {
+          candidatesInfo = ` • Tabel "candidates" Aktif (${cTest.count ?? 0} kandidat)`;
+        }
+      } catch {}
+
+      try {
+        const vTest = await client.from('voters').select('id', { count: 'exact', head: true });
+        if (!vTest.error) {
+          votersInfo = ` • Tabel "voters" Aktif (${vTest.count ?? 0} siswa DPT)`;
+        }
+      } catch {}
+
       return {
         success: true,
-        message: `Berhasil terhubung ke Supabase! Tabel "${targetTable}" aktif dan siap digunakan.`,
+        message: `Berhasil terhubung ke Supabase! Tabel "${targetTable}" aktif.${candidatesInfo}${votersInfo}`,
         rowCount: data ? data.length : 0,
         detectedTable: targetTable,
       };
@@ -304,11 +322,11 @@ class StorageService {
   public getSQLSchema(): string {
     const table = this.config.tableName || DEFAULT_TABLE_NAME;
     return `-- ========================================================
--- SCRIPT TABEL SUPABASE E-VOTING BADMINTON RESMI
--- Salin dan jalankan script ini di menu "SQL Editor" di Supabase Anda
+-- SCRIPT TABEL SUPABASE E-VOTING BADMINTON RESMI (SMAN 1 CIKAMPEK)
+-- Salin dan jalankan seluruh script ini di menu "SQL Editor" Supabase
 -- ========================================================
 
--- 1. Buat Tabel Data Suara (Votes)
+-- BAGIAN 1: TABEL DATA SUARA HASIL PEMILIHAN (VOTES)
 CREATE TABLE IF NOT EXISTS public.${table} (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
@@ -325,38 +343,87 @@ CREATE TABLE IF NOT EXISTS public.${table} (
     user_agent TEXT
 );
 
--- 2. Aktifkan Row Level Security (RLS)
 ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY;
 
--- 3. Kebijakan Izin Membaca (Semua pemilih dapat melihat rekapitulasi)
-CREATE POLICY "Izinkan publik membaca data suara" 
-ON public.${table} 
-FOR SELECT 
-USING (true);
+DROP POLICY IF EXISTS "Izinkan publik membaca data suara" ON public.${table};
+CREATE POLICY "Izinkan publik membaca data suara" ON public.${table} FOR SELECT USING (true);
 
--- 4. Kebijakan Izin Menyimpan Suara (Publik/Anonim dapat mengirim vote)
-CREATE POLICY "Izinkan publik mengirim suara vote" 
-ON public.${table} 
-FOR INSERT 
-WITH CHECK (true);
+DROP POLICY IF EXISTS "Izinkan publik mengirim suara vote" ON public.${table};
+CREATE POLICY "Izinkan publik mengirim suara vote" ON public.${table} FOR INSERT WITH CHECK (true);
 
--- 5. Kebijakan Izin Menghapus Suara (Untuk reset pemilu atau penghapusan data oleh panitia)
-CREATE POLICY "Izinkan panitia menghapus suara vote" 
-ON public.${table} 
-FOR DELETE 
-USING (true);
+DROP POLICY IF EXISTS "Izinkan panitia menghapus suara vote" ON public.${table};
+CREATE POLICY "Izinkan panitia menghapus suara vote" ON public.${table} FOR DELETE USING (true);
 
--- 6. Kebijakan Izin Memperbarui Suara
-CREATE POLICY "Izinkan panitia memperbarui suara vote" 
-ON public.${table} 
-FOR UPDATE 
-USING (true)
-WITH CHECK (true);
+DROP POLICY IF EXISTS "Izinkan panitia memperbarui suara vote" ON public.${table};
+CREATE POLICY "Izinkan panitia memperbarui suara vote" ON public.${table} FOR UPDATE USING (true) WITH CHECK (true);
 
--- 7. Buat Index untuk pencarian cepat
+-- Proteksi 1 Siswa = 1 Kali Pakai di Level Database
+CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_nisn_unique ON public.${table} (nisn);
 CREATE INDEX IF NOT EXISTS idx_${table}_nisn ON public.${table} (nisn);
 CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_at DESC);
-`;
+
+
+-- BAGIAN 2: TABEL DATA KANDIDAT KETUA & WAKIL (CANDIDATES - REAL-TIME)
+CREATE TABLE IF NOT EXISTS public.candidates (
+    id TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('putra', 'putri')),
+    number TEXT NOT NULL,
+    name TEXT NOT NULL,
+    nickname TEXT DEFAULT '',
+    class_grade TEXT DEFAULT '',
+    photo_url TEXT DEFAULT '',
+    motto TEXT DEFAULT '',
+    racket_specialty TEXT DEFAULT '',
+    vision TEXT DEFAULT '',
+    missions JSONB DEFAULT '[]'::jsonb,
+    achievements JSONB DEFAULT '[]'::jsonb
+);
+
+ALTER TABLE public.candidates ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Izinkan publik membaca data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan publik membaca data kandidat" ON public.candidates FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Izinkan admin menambah data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan admin menambah data kandidat" ON public.candidates FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Izinkan admin memperbarui data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan admin memperbarui data kandidat" ON public.candidates FOR UPDATE USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Izinkan admin menghapus data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan admin menghapus data kandidat" ON public.candidates FOR DELETE USING (true);
+
+-- Aktifkan Real-Time Sinkronisasi Supabase untuk Tabel Kandidat
+ALTER PUBLICATION supabase_realtime ADD TABLE public.candidates;
+
+-- Data Awal Resmi Kandidat (Opsional / Seed Data)
+INSERT INTO public.candidates (id, category, number, name, nickname, class_grade, photo_url, motto, racket_specialty, vision, missions, achievements)
+VALUES
+('putra-01', 'putra', '01', 'Fajar Nur Hidayat', 'Fajar', 'XI MIPA 1', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80', 'Disiplin adalah Kunci Juara Sejati', 'Tunggal Putra / Power Smash & Net Play', 'Menjadikan Ekstrakurikuler Bulutangkis SMAN 1 Cikampek sebagai wadah pengembangan atlet berprestasi, berintegritas, dan menjunjung tinggi sportivitas di tingkat Kabupaten maupun Provinsi.', '["Mengadakan jadwal latihan intensif terprogram 3 kali seminggu bersama pelatih berlisensi","Menjalin sparing partner rutin antarsekolah tiap 2 bulan untuk mengasah mental bertanding","Membentuk tim khusus regenerasi dari kelas X untuk persiapan turnamen O2SN"]'::jsonb, '["Juara 1 Tunggal Putra O2SN Tingkat Kabupaten 2025","Medali Emas Kejurkab Bulutangkis Pelajar 2024"]'::jsonb),
+('putra-02', 'putra', '02', 'Kevin Arya Wicaksana', 'Kevin', 'XI IPS 2', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80', 'Kompak di Lapangan, Juara di Podium', 'Ganda Putra / Playmaker & Drive Cepat', 'Membangun klub bulutangkis yang solid, inklusif bagi pemula maupun atlet, serta konsisten meraih podium di kejuaraan antarsekolah.', '["Memfasilitasi program pembinaan berjenjang dari pemula (basic skills) hingga kelas tanding (atlet)","Menyelenggarakan turnamen internal Smansa Badminton Cup setiap semester","Memperbaiki manajemen inventaris dan perawatan perlengkapan raket dan shuttlecock"]'::jsonb, '["Juara 2 Ganda Putra Kejuaraan Antar Pelajar 2025","Semifinalis Sirkuit Remaja Regional 2024"]'::jsonb),
+('putra-03', 'putra', '03', 'Rizky Bintang Ramadhan', 'Bintang', 'XI MIPA 3', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80', 'Pantang Pulang Sebelum Kok Menyentuh Lantai', 'Tunggal & Ganda / Rally Ketahanan Fisik', 'Mencetak atlet bulutangkis yang tangguh secara mental, memiliki stamina prima, dan mampu bersaing di tingkat nasional.', '["Fokus pada pelatihan fisik atletik modern, kelincahan footwork, dan pemulihan stamina","Mengadakan sesi bedah taktik pertandingan menggunakan rekaman video analisis","Menyediakan beasiswa peralatan (raket & senar) untuk atlet berprestasi kurang mampu"]'::jsonb, '["Juara 1 Kejuaraan Bulutangkis Kapolres Cup 2025","Peringkat 8 Besar Popda Jawa Barat 2024"]'::jsonb),
+('putri-01', 'putri', '01', 'Siti Nurhaliza Putri', 'Liza', 'XI MIPA 2', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80', 'Sportif, Berprestasi, dan Berkarakter', 'Tunggal Putri / Deception & Dropshot Akurat', 'Mewujudkan tim bulutangkis putri yang disegani dengan kombinasi kecerdasan taktik, kedisiplinan, dan kekeluargaan yang erat.', '["Meningkatkan porsi latihan teknik penempatan bola dan kelenturan tubuh untuk atlet putri","Menyelenggarakan workshop mental bertanding dan nutrisi atlet bersama alumni berprestasi","Mengadakan bakti sosial dan coaching clinic bulutangkis untuk siswa SMP sekitar"]'::jsonb, '["Juara 1 Tunggal Putri O2SN Kabupaten 2025","Best Player Turnamen Pelajar Se-Jabar 2024"]'::jsonb),
+('putri-02', 'putri', '02', 'Nayla Putri Maharani', 'Nayla', 'XI IPS 1', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80', 'Bersama Mengukir Prestasi Emas', 'Ganda Putri & Campuran / Intercept Cepat', 'Menjadikan bulutangkis putri sebagai cabang ekstrakurikuler unggulan utama sekolah dengan tata kelola profesional dan transparan.', '["Menyusun sistem evaluasi kemajuan latihan berbasis data statistik setiap bulan","Memperbanyak uji tanding persahabatan ke klub-klub bulutangkis ternama","Mempererat kekeluargaan anggota melalui kegiatan gathering tahunan"]'::jsonb, '["Juara 2 Ganda Putri Kejurkab 2025","Juara 3 Ganda Campuran Kejurda 2024"]'::jsonb),
+('putri-03', 'putri', '03', 'Amanda Cinta Lestari', 'Amanda', 'XI MIPA 4', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80', 'Tekad Kuat Menembus Batas Prestasi', 'Tunggal Putri / Agresif Smash & Serangan Cepat', 'Membangun generasi pebulutangkis putri yang percaya diri, memiliki mental juara di setiap turnamen, dan seimbang dengan prestasi akademik.', '["Pendampingan akademik bagi anggota ekskul agar nilai pelajaran tetap unggul saat persiapan lomba","Latihan khusus kekuatan pergelangan tangan dan variasi servis mematikan","Mengikutsertakan seluruh anggota dalam turnamen terbuka tingkat karesidenan"]'::jsonb, '["Juara 1 Kejuaraan Pelajar Provinsi 2025","Juara 2 Tunggal Putri Djarum Sirnas 2024"]'::jsonb)
+ON CONFLICT (id) DO UPDATE SET
+  category = EXCLUDED.category,
+  number = EXCLUDED.number,
+  name = EXCLUDED.name,
+  nickname = EXCLUDED.nickname,
+  class_grade = EXCLUDED.class_grade,
+  photo_url = EXCLUDED.photo_url,
+  motto = EXCLUDED.motto,
+  racket_specialty = EXCLUDED.racket_specialty,
+  vision = EXCLUDED.vision,
+  missions = EXCLUDED.missions,
+  achievements = EXCLUDED.achievements;
+\n\n` + VOTERS_127_SQL_SCHEMA;
+  }
+
+  // Script SQL Khusus untuk 127 Siswa DPT Supabase (1 Siswa = 1 Kali Pakai)
+  public getVotersSQLSchema(): string {
+    return VOTERS_127_SQL_SCHEMA;
   }
 
   // Cek apakah NISN sudah pernah memilih
@@ -493,6 +560,23 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
       throw new Error(`NISN ${nisn} atas nama ${check.record?.voterName} sudah menggunakan hak suaranya pada ${new Date(check.record?.createdAt || '').toLocaleString('id-ID')}. Satu pemilih hanya dapat memilih satu kali.`);
     }
 
+    // Cek duplikasi hak suara secara real-time di Supabase (Jaminan 1 Siswa = 1 Kali Pakai)
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const { data: remoteVCheck } = await this.supabase
+          .from('voters')
+          .select('has_voted, name, vote_code')
+          .ilike('nisn', nisn)
+          .limit(1);
+
+        if (remoteVCheck && remoteVCheck.length > 0 && remoteVCheck[0].has_voted) {
+          throw new Error(`NISN ${nisn} atas nama ${remoteVCheck[0].name} sudah menggunakan hak suaranya sebelumnya (Kode: ${remoteVCheck[0].vote_code || '-'}). Setiap siswa hanya dapat memilih 1 kali.`);
+        }
+      } catch (err: any) {
+        if (err.message?.includes('sudah menggunakan hak suara')) throw err;
+      }
+    }
+
     // 3. Generate Kode Suara Unik dan ID
     const randomDigits = Math.floor(1000 + Math.random() * 9000);
     const voteCode = `BDM-${Date.now().toString().slice(-4)}-${randomDigits}`;
@@ -608,6 +692,20 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
             v.voteCode === newRecord.voteCode ? { ...v, syncedToSupabase: true } : v
           );
           localStorage.setItem(STORAGE_KEYS.VOTES, JSON.stringify(updated));
+
+          // Kunci status hak suara di tabel voters Supabase (1 Siswa = 1 Kali Pakai)
+          try {
+            await this.supabase
+              .from('voters')
+              .update({
+                has_voted: true,
+                vote_code: newRecord.voteCode,
+                voted_at: newRecord.createdAt,
+              })
+              .ilike('nisn', newRecord.nisn);
+          } catch (vErr) {
+            console.warn('Gagal update status voter di Supabase:', vErr);
+          }
         }
       } catch (err: any) {
         this.lastSupabaseError = `Eksepsi Supabase: ${err.message || 'Network error'}`;
@@ -690,8 +788,70 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
   }
 
   // ==========================================
-  // MANAJEMEN KANDIDAT (CRUD KANDIDAT PUTRA & PUTRI)
+  // MANAJEMEN KANDIDAT (CRUD KANDIDAT PUTRA & PUTRI + SUPABASE REAL-TIME)
   // ==========================================
+
+  // Konversi dari model Candidate ke baris Supabase (snake_case)
+  private candidateToRow(c: Candidate): any {
+    return {
+      id: c.id,
+      category: c.category,
+      number: c.number,
+      name: c.name,
+      nickname: c.nickname || c.name.split(' ')[0] || '',
+      class_grade: c.classGrade || '',
+      photo_url: c.photoUrl || '',
+      motto: c.motto || '',
+      racket_specialty: c.racketSpecialty || '',
+      vision: c.vision || '',
+      missions: Array.isArray(c.missions) ? c.missions : [],
+      achievements: Array.isArray(c.achievements) ? c.achievements : [],
+    };
+  }
+
+  // Konversi dari baris Supabase ke model Candidate
+  private rowToCandidate(row: any): Candidate {
+    let missions: string[] = [];
+    if (Array.isArray(row.missions)) {
+      missions = row.missions;
+    } else if (typeof row.missions === 'string') {
+      try {
+        const parsed = JSON.parse(row.missions);
+        missions = Array.isArray(parsed) ? parsed : [row.missions];
+      } catch {
+        missions = [row.missions];
+      }
+    }
+
+    let achievements: string[] = [];
+    if (Array.isArray(row.achievements)) {
+      achievements = row.achievements;
+    } else if (typeof row.achievements === 'string') {
+      try {
+        const parsed = JSON.parse(row.achievements);
+        achievements = Array.isArray(parsed) ? parsed : [row.achievements];
+      } catch {
+        achievements = [row.achievements];
+      }
+    }
+
+    return {
+      id: String(row.id),
+      category: row.category === 'putri' ? 'putri' : 'putra',
+      number: String(row.number || '01').padStart(2, '0'),
+      name: row.name || 'Kandidat',
+      nickname: row.nickname || (row.name ? row.name.split(' ')[0] : 'Kandidat'),
+      classGrade: row.class_grade || row.classGrade || 'XI',
+      photoUrl: row.photo_url || row.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+      motto: row.motto || '',
+      racketSpecialty: row.racket_specialty || row.racketSpecialty || '',
+      vision: row.vision || '',
+      missions: missions.length > 0 ? missions : ['Mengembangkan ekstrakurikuler bulutangkis'],
+      achievements: achievements.length > 0 ? achievements : ['Anggota aktif ekstrakurikuler'],
+    };
+  }
+
+  // Baca kandidat dari cache lokal (cepat & sinkron untuk render awal)
   public getCandidates(): Candidate[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.CANDIDATES);
@@ -701,33 +861,376 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
     }
   }
 
-  public saveCandidates(candidates: Candidate[]): void {
+  // Simpan ke cache lokal
+  public saveCandidatesLocal(candidates: Candidate[]): void {
     localStorage.setItem(STORAGE_KEYS.CANDIDATES, JSON.stringify(candidates));
   }
 
-  public addCandidate(candidate: Candidate): void {
+  // 1. SELECT (AMBIL) KANDIDAT DARI SUPABASE
+  public async fetchCandidatesFromSupabase(): Promise<Candidate[]> {
+    if (!this.supabase || !this.config.isConnected) {
+      return this.getCandidates();
+    }
+
+    try {
+      const { data, error } = await this.supabase
+        .from('candidates')
+        .select('*')
+        .order('category', { ascending: false })
+        .order('number', { ascending: true });
+
+      if (error) {
+        // Jika tabel belum dibuat (Error 42P01), jangan crash, gunakan data lokal
+        if (error.code === '42P01' || error.message?.toLowerCase().includes('does not exist')) {
+          console.warn('Tabel "candidates" belum dibuat di Supabase. Menampilkan kandidat dari penyimpanan lokal.');
+        } else {
+          console.warn('Gagal query candidates dari Supabase:', error.message);
+        }
+        return this.getCandidates();
+      }
+
+      if (data && data.length > 0) {
+        const candidates = data.map((r: any) => this.rowToCandidate(r));
+        this.saveCandidatesLocal(candidates);
+        return candidates;
+      } else {
+        // Jika tabel candidates di Supabase masih kosong (0 baris), otomatis upload INITIAL_CANDIDATES
+        console.log('Tabel candidates di Supabase kosong. Melakukan inisialisasi kandidat awal ke Supabase...');
+        const initial = this.getCandidates();
+        try {
+          const rows = initial.map(c => this.candidateToRow(c));
+          await this.supabase.from('candidates').insert(rows);
+        } catch (seedErr) {
+          console.warn('Gagal otomatis seed candidates:', seedErr);
+        }
+        return initial;
+      }
+    } catch (err) {
+      console.warn('Error saat mengambil kandidat dari Supabase:', err);
+      return this.getCandidates();
+    }
+  }
+
+  // Ambil kandidat secara asinkron (mencoba Supabase terlebih dahulu, fallback ke lokal)
+  public async getCandidatesAsync(): Promise<Candidate[]> {
+    if (this.supabase && this.config.isConnected) {
+      return await this.fetchCandidatesFromSupabase();
+    }
+    return this.getCandidates();
+  }
+
+  // 2. INSERT (TAMBAH) KANDIDAT KE SUPABASE
+  public async addCandidate(candidate: Candidate): Promise<{ success: boolean; message: string }> {
+    // Simpan ke local cache terlebih dahulu
     const list = this.getCandidates();
-    list.push(candidate);
-    this.saveCandidates(list);
+    const updatedList = list.filter(c => c.id !== candidate.id);
+    updatedList.push(candidate);
+    this.saveCandidatesLocal(updatedList);
+
+    // Kirim INSERT ke Supabase
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const row = this.candidateToRow(candidate);
+        const { error } = await this.supabase
+          .from('candidates')
+          .insert(row);
+
+        if (error) {
+          console.error('Supabase INSERT candidate error:', error);
+          return {
+            success: true,
+            message: `Kandidat "${candidate.name}" tersimpan secara lokal, namun gagal sinkron ke Supabase: ${error.message}. Pastikan tabel "candidates" sudah dibuat.`
+          };
+        }
+        return {
+          success: true,
+          message: `Kandidat "${candidate.name}" berhasil ditambahkan dan disinkronkan langsung ke Supabase!`
+        };
+      } catch (err: any) {
+        return {
+          success: true,
+          message: `Kandidat tersimpan di perangkat (${err.message}).`
+        };
+      }
+    }
+
+    return {
+      success: true,
+      message: `Kandidat "${candidate.name}" berhasil disimpan di perangkat lokal.`
+    };
   }
 
-  public updateCandidate(updated: Candidate): void {
-    const list = this.getCandidates().map(c => c.id === updated.id ? updated : c);
-    this.saveCandidates(list);
+  // 3. UPDATE (EDIT) KANDIDAT DI SUPABASE
+  public async updateCandidate(candidate: Candidate): Promise<{ success: boolean; message: string }> {
+    // Perbarui local cache terlebih dahulu
+    const list = this.getCandidates().map(c => c.id === candidate.id ? candidate : c);
+    this.saveCandidatesLocal(list);
+
+    // Kirim UPDATE ke Supabase
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const row = this.candidateToRow(candidate);
+        const { error } = await this.supabase
+          .from('candidates')
+          .update(row)
+          .eq('id', candidate.id);
+
+        if (error) {
+          console.error('Supabase UPDATE candidate error:', error);
+          return {
+            success: true,
+            message: `Perubahan tersimpan lokal, namun gagal sinkron ke Supabase: ${error.message}`
+          };
+        }
+        return {
+          success: true,
+          message: `Data kandidat "${candidate.name}" berhasil diperbarui langsung di Supabase!`
+        };
+      } catch (err: any) {
+        return {
+          success: true,
+          message: `Perubahan tersimpan secara lokal (${err.message}).`
+        };
+      }
+    }
+
+    return {
+      success: true,
+      message: `Data kandidat "${candidate.name}" berhasil diperbarui.`
+    };
   }
 
-  public deleteCandidate(id: string): void {
+  // 4. DELETE (HAPUS) KANDIDAT DARI SUPABASE
+  public async deleteCandidate(id: string): Promise<{ success: boolean; message: string }> {
+    const candidate = this.getCandidates().find(c => c.id === id);
+    const candName = candidate ? candidate.name : id;
+
+    // Hapus dari local cache
     const list = this.getCandidates().filter(c => c.id !== id);
-    this.saveCandidates(list);
+    this.saveCandidatesLocal(list);
+
+    // Kirim DELETE ke Supabase
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const { error } = await this.supabase
+          .from('candidates')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('Supabase DELETE candidate error:', error);
+          return {
+            success: true,
+            message: `Kandidat dihapus secara lokal, namun gagal hapus di Supabase: ${error.message}`
+          };
+        }
+        return {
+          success: true,
+          message: `Kandidat "${candName}" berhasil dihapus dari Supabase!`
+        };
+      } catch (err: any) {
+        return {
+          success: true,
+          message: `Kandidat dihapus secara lokal (${err.message}).`
+        };
+      }
+    }
+
+    return {
+      success: true,
+      message: `Kandidat "${candName}" berhasil dihapus.`
+    };
   }
 
-  public resetCandidates(): void {
-    this.saveCandidates(INITIAL_CANDIDATES);
+  // Simpan banyak kandidat sekaligus (Bulk Upsert)
+  public async saveCandidates(candidates: Candidate[]): Promise<{ success: boolean; message: string }> {
+    this.saveCandidatesLocal(candidates);
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const rows = candidates.map(c => this.candidateToRow(c));
+        const { error } = await this.supabase
+          .from('candidates')
+          .upsert(rows, { onConflict: 'id' });
+
+        if (error) {
+          return { success: false, message: error.message };
+        }
+        return { success: true, message: 'Data kandidat berhasil disinkronkan ke Supabase.' };
+      } catch (err: any) {
+        return { success: false, message: err.message };
+      }
+    }
+    return { success: true, message: 'Data kandidat disimpan di lokal.' };
+  }
+
+  // Kembalikan seluruh kandidat ke susunan default
+  public async resetCandidates(): Promise<{ success: boolean; message: string }> {
+    this.saveCandidatesLocal(INITIAL_CANDIDATES);
+    if (this.supabase && this.config.isConnected) {
+      try {
+        await this.supabase.from('candidates').delete().neq('id', '___dummy___');
+        const rows = INITIAL_CANDIDATES.map(c => this.candidateToRow(c));
+        await this.supabase.from('candidates').insert(rows);
+        return { success: true, message: 'Daftar kandidat di Supabase berhasil direset ke susunan default!' };
+      } catch (err: any) {
+        console.warn('Gagal reset kandidat di Supabase:', err);
+      }
+    }
+    return { success: true, message: 'Daftar kandidat berhasil dikembalikan ke default.' };
+  }
+
+  // 5. REAL-TIME SUBSCRIPTION KE SUPABASE UNTUK TABEL KANDIDAT
+  public subscribeCandidates(callback: (candidates: Candidate[]) => void): () => void {
+    if (!this.supabase || !this.config.isConnected) {
+      return () => {};
+    }
+    try {
+      const channelName = `realtime_candidates_${Math.random().toString(36).substring(2, 8)}`;
+      const channel = this.supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'candidates' },
+          async (payload) => {
+            console.log('📡 Perubahan data kandidat realtime terdeteksi:', payload.eventType);
+            const fresh = await this.fetchCandidatesFromSupabase();
+            callback(fresh);
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Realtime candidates channel aktif');
+          }
+        });
+
+      return () => {
+        try {
+          this.supabase?.removeChannel(channel);
+        } catch (e) {
+          console.warn('Error removing channel:', e);
+        }
+      };
+    } catch (err) {
+      console.warn('Gagal membuat realtime subscription candidates:', err);
+      return () => {};
+    }
+  }
+
+  // Script SQL Khusus untuk Tabel Candidates di Supabase
+  public getCandidatesSQLSchema(): string {
+    return `-- ========================================================
+-- SCRIPT TABEL KANDIDAT SUPABASE (REAL-TIME SINKRONISASI)
+-- Salin dan jalankan script ini di menu "SQL Editor" di Supabase Anda
+-- ========================================================
+
+-- 1. Buat Tabel Data Kandidat (Candidates)
+CREATE TABLE IF NOT EXISTS public.candidates (
+    id TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('putra', 'putri')),
+    number TEXT NOT NULL,
+    name TEXT NOT NULL,
+    nickname TEXT DEFAULT '',
+    class_grade TEXT DEFAULT '',
+    photo_url TEXT DEFAULT '',
+    motto TEXT DEFAULT '',
+    racket_specialty TEXT DEFAULT '',
+    vision TEXT DEFAULT '',
+    missions JSONB DEFAULT '[]'::jsonb,
+    achievements JSONB DEFAULT '[]'::jsonb
+);
+
+-- 2. Aktifkan Row Level Security (RLS)
+ALTER TABLE public.candidates ENABLE ROW LEVEL SECURITY;
+
+-- 3. Kebijakan Izin Membaca (Semua pemilih dapat melihat calon)
+DROP POLICY IF EXISTS "Izinkan publik membaca data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan publik membaca data kandidat" 
+ON public.candidates 
+FOR SELECT 
+USING (true);
+
+-- 4. Kebijakan Izin Menambah Kandidat (Admin)
+DROP POLICY IF EXISTS "Izinkan admin menambah data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan admin menambah data kandidat" 
+ON public.candidates 
+FOR INSERT 
+WITH CHECK (true);
+
+-- 5. Kebijakan Izin Memperbarui Kandidat (Admin)
+DROP POLICY IF EXISTS "Izinkan admin memperbarui data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan admin memperbarui data kandidat" 
+ON public.candidates 
+FOR UPDATE 
+USING (true)
+WITH CHECK (true);
+
+-- 6. Kebijakan Izin Menghapus Kandidat (Admin)
+DROP POLICY IF EXISTS "Izinkan admin menghapus data kandidat" ON public.candidates;
+CREATE POLICY "Izinkan admin menghapus data kandidat" 
+ON public.candidates 
+FOR DELETE 
+USING (true);
+
+-- 7. Aktifkan Supabase Realtime untuk tabel candidates
+ALTER PUBLICATION supabase_realtime ADD TABLE public.candidates;
+
+-- 8. Masukkan Data Calon Awal Resmi SMAN 1 Cikampek (Seed Data)
+INSERT INTO public.candidates (id, category, number, name, nickname, class_grade, photo_url, motto, racket_specialty, vision, missions, achievements)
+VALUES
+('putra-01', 'putra', '01', 'Fajar Nur Hidayat', 'Fajar', 'XI MIPA 1', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80', 'Disiplin adalah Kunci Juara Sejati', 'Tunggal Putra / Power Smash & Net Play', 'Menjadikan Ekstrakurikuler Bulutangkis SMAN 1 Cikampek sebagai wadah pengembangan atlet berprestasi, berintegritas, dan menjunjung tinggi sportivitas di tingkat Kabupaten maupun Provinsi.', '["Mengadakan jadwal latihan intensif terprogram 3 kali seminggu bersama pelatih berlisensi","Menjalin sparing partner rutin antarsekolah tiap 2 bulan untuk mengasah mental bertanding","Membentuk tim khusus regenerasi dari kelas X untuk persiapan turnamen O2SN"]'::jsonb, '["Juara 1 Tunggal Putra O2SN Tingkat Kabupaten 2025","Medali Emas Kejurkab Bulutangkis Pelajar 2024"]'::jsonb),
+('putra-02', 'putra', '02', 'Kevin Arya Wicaksana', 'Kevin', 'XI IPS 2', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80', 'Kompak di Lapangan, Juara di Podium', 'Ganda Putra / Playmaker & Drive Cepat', 'Membangun klub bulutangkis yang solid, inklusif bagi pemula maupun atlet, serta konsisten meraih podium di kejuaraan antarsekolah.', '["Memfasilitasi program pembinaan berjenjang dari pemula (basic skills) hingga kelas tanding (atlet)","Menyelenggarakan turnamen internal Smansa Badminton Cup setiap semester","Memperbaiki manajemen inventaris dan perawatan perlengkapan raket dan shuttlecock"]'::jsonb, '["Juara 2 Ganda Putra Kejuaraan Antar Pelajar 2025","Semifinalis Sirkuit Remaja Regional 2024"]'::jsonb),
+('putra-03', 'putra', '03', 'Rizky Bintang Ramadhan', 'Bintang', 'XI MIPA 3', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80', 'Pantang Pulang Sebelum Kok Menyentuh Lantai', 'Tunggal & Ganda / Rally Ketahanan Fisik', 'Mencetak atlet bulutangkis yang tangguh secara mental, memiliki stamina prima, dan mampu bersaing di tingkat nasional.', '["Fokus pada pelatihan fisik atletik modern, kelincahan footwork, dan pemulihan stamina","Mengadakan sesi bedah taktik pertandingan menggunakan rekaman video analisis","Menyediakan beasiswa peralatan (raket & senar) untuk atlet berprestasi kurang mampu"]'::jsonb, '["Juara 1 Kejuaraan Bulutangkis Kapolres Cup 2025","Peringkat 8 Besar Popda Jawa Barat 2024"]'::jsonb),
+('putri-01', 'putri', '01', 'Siti Nurhaliza Putri', 'Liza', 'XI MIPA 2', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80', 'Sportif, Berprestasi, dan Berkarakter', 'Tunggal Putri / Deception & Dropshot Akurat', 'Mewujudkan tim bulutangkis putri yang disegani dengan kombinasi kecerdasan taktik, kedisiplinan, dan kekeluargaan yang erat.', '["Meningkatkan porsi latihan teknik penempatan bola dan kelenturan tubuh untuk atlet putri","Menyelenggarakan workshop mental bertanding dan nutrisi atlet bersama alumni berprestasi","Mengadakan bakti sosial dan coaching clinic bulutangkis untuk siswa SMP sekitar"]'::jsonb, '["Juara 1 Tunggal Putri O2SN Kabupaten 2025","Best Player Turnamen Pelajar Se-Jabar 2024"]'::jsonb),
+('putri-02', 'putri', '02', 'Nayla Putri Maharani', 'Nayla', 'XI IPS 1', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80', 'Bersama Mengukir Prestasi Emas', 'Ganda Putri & Campuran / Intercept Cepat', 'Menjadikan bulutangkis putri sebagai cabang ekstrakurikuler unggulan utama sekolah dengan tata kelola profesional dan transparan.', '["Menyusun sistem evaluasi kemajuan latihan berbasis data statistik setiap bulan","Memperbanyak uji tanding persahabatan ke klub-klub bulutangkis ternama","Mempererat kekeluargaan anggota melalui kegiatan gathering tahunan"]'::jsonb, '["Juara 2 Ganda Putri Kejurkab 2025","Juara 3 Ganda Campuran Kejurda 2024"]'::jsonb),
+('putri-03', 'putri', '03', 'Amanda Cinta Lestari', 'Amanda', 'XI MIPA 4', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80', 'Tekad Kuat Menembus Batas Prestasi', 'Tunggal Putri / Agresif Smash & Serangan Cepat', 'Membangun generasi pebulutangkis putri yang percaya diri, memiliki mental juara di setiap turnamen, dan seimbang dengan prestasi akademik.', '["Pendampingan akademik bagi anggota ekskul agar nilai pelajaran tetap unggul saat persiapan lomba","Latihan khusus kekuatan pergelangan tangan dan variasi servis mematikan","Mengikutsertakan seluruh anggota dalam turnamen terbuka tingkat karesidenan"]'::jsonb, '["Juara 1 Kejuaraan Pelajar Provinsi 2025","Juara 2 Tunggal Putri Djarum Sirnas 2024"]'::jsonb)
+ON CONFLICT (id) DO UPDATE SET
+  category = EXCLUDED.category,
+  number = EXCLUDED.number,
+  name = EXCLUDED.name,
+  nickname = EXCLUDED.nickname,
+  class_grade = EXCLUDED.class_grade,
+  photo_url = EXCLUDED.photo_url,
+  motto = EXCLUDED.motto,
+  racket_specialty = EXCLUDED.racket_specialty,
+  vision = EXCLUDED.vision,
+  missions = EXCLUDED.missions,
+  achievements = EXCLUDED.achievements;
+`;
   }
 
   // ==========================================
-  // MANAJEMEN DAFTAR PEMILIH TETAP (DPT / USER)
+  // MANAJEMEN DAFTAR PEMILIH TETAP (127 SISWA DPT + SUPABASE REAL-TIME)
+  // Hak Suara Terproteksi: 1 Siswa = 1 Kali Pakai
   // ==========================================
+
+  private voterToRow(v: RegisteredVoter): any {
+    return {
+      id: v.id,
+      nisn: v.nisn.trim(),
+      name: v.name.trim(),
+      student_class: v.studentClass.trim(),
+      gender: v.gender,
+      has_voted: Boolean(v.hasVoted),
+      vote_code: v.voteCode || null,
+      voted_at: v.votedAt || null,
+    };
+  }
+
+  private rowToVoter(row: any): RegisteredVoter {
+    return {
+      id: String(row.id || `voter-${row.nisn}`),
+      nisn: String(row.nisn).trim(),
+      name: String(row.name || 'Siswa').trim(),
+      studentClass: String(row.student_class || row.studentClass || '-').trim(),
+      gender: (row.gender === 'P' ? 'P' : 'L') as 'L' | 'P',
+      hasVoted: Boolean(row.has_voted),
+      voteCode: row.vote_code || undefined,
+      votedAt: row.voted_at || undefined,
+    };
+  }
+
+  // Baca DPT dari cache lokal (cepat untuk render UI)
   public getRegisteredVoters(): RegisteredVoter[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.REGISTERED_VOTERS);
@@ -741,7 +1244,118 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
     localStorage.setItem(STORAGE_KEYS.REGISTERED_VOTERS, JSON.stringify(voters));
   }
 
-  public addRegisteredVoter(voterData: Omit<RegisteredVoter, 'id' | 'hasVoted'>): RegisteredVoter {
+  // 1. SELECT (AMBIL) 127 PEMILIH DARI SUPABASE
+  public async fetchRegisteredVotersFromSupabase(): Promise<RegisteredVoter[]> {
+    if (!this.supabase || !this.config.isConnected) {
+      return this.getRegisteredVoters();
+    }
+
+    try {
+      const { data, error } = await this.supabase
+        .from('voters')
+        .select('*')
+        .order('nisn', { ascending: true });
+
+      if (error) {
+        if (error.code === '42P01' || error.message?.toLowerCase().includes('does not exist')) {
+          console.warn('Tabel "voters" belum ada di Supabase. Menggunakan data lokal DPT 127 siswa.');
+        } else {
+          console.warn('Gagal ambil data voters dari Supabase:', error.message);
+        }
+        return this.getRegisteredVoters();
+      }
+
+      if (data && data.length > 0) {
+        const mapped = data.map((r: any) => this.rowToVoter(r));
+        this.saveRegisteredVoters(mapped);
+        return mapped;
+      } else {
+        // Tabel voters di Supabase kosong: otomatis seed 127 siswa DPT ke Supabase!
+        console.log('Tabel voters di Supabase masih kosong. Melakukan sinkronisasi 127 siswa DPT awal...');
+        const initial = this.getRegisteredVoters();
+        await this.seedVotersToSupabase(initial);
+        return initial;
+      }
+    } catch (err) {
+      console.warn('Error saat fetch registered voters:', err);
+      return this.getRegisteredVoters();
+    }
+  }
+
+  // Unggah batch 127 siswa pemilih ke Supabase
+  public async seedVotersToSupabase(voters: RegisteredVoter[]): Promise<void> {
+    if (!this.supabase || !this.config.isConnected) return;
+    try {
+      const rows = voters.map(v => this.voterToRow(v));
+      // Chunk per 40 baris agar request stabil
+      for (let i = 0; i < rows.length; i += 40) {
+        const chunk = rows.slice(i, i + 40);
+        await this.supabase.from('voters').upsert(chunk, { onConflict: 'nisn' });
+      }
+      console.log(`✅ Berhasil menyinkronkan ${voters.length} pemilih ke tabel voters Supabase`);
+    } catch (e) {
+      console.warn('Gagal seed voters ke Supabase:', e);
+    }
+  }
+
+  // Unggah batch 127 siswa pemilih resmi ke Supabase (1-Klik Sinkronisasi DPT)
+  public async sync127VotersToSupabase(): Promise<{ success: boolean; count: number; message: string }> {
+    if (!this.supabase || !this.config.isConnected) {
+      this.saveRegisteredVoters(OFFICIAL_REGISTERED_VOTERS);
+      return {
+        success: false,
+        count: OFFICIAL_REGISTERED_VOTERS.length,
+        message: 'Supabase belum terhubung. Harap isi URL dan Anon Key di Pengaturan Database terlebih dahulu.'
+      };
+    }
+
+    try {
+      const rows = OFFICIAL_REGISTERED_VOTERS.map(v => this.voterToRow(v));
+      let syncedCount = 0;
+
+      // Batch 30 baris per request agar stabil dan terhindar dari payload limit
+      for (let i = 0; i < rows.length; i += 30) {
+        const chunk = rows.slice(i, i + 30);
+        const { error } = await this.supabase
+          .from('voters')
+          .upsert(chunk, { onConflict: 'nisn' });
+
+        if (error) {
+          if (error.code === '42P01' || error.message?.toLowerCase().includes('does not exist')) {
+            throw new Error(`Tabel "voters" belum ada di Supabase. Silakan jalankan script SQL tabel DPT di menu Pengaturan / DPT terlebih dahulu.`);
+          }
+          throw error;
+        }
+        syncedCount += chunk.length;
+      }
+
+      // Refresh data lokal dari Supabase
+      const fresh = await this.fetchRegisteredVotersFromSupabase();
+
+      return {
+        success: true,
+        count: fresh.length || syncedCount,
+        message: `Berhasil mengunggah dan menyinkronkan 127 Siswa DPT SMAN 1 Cikampek ke Supabase! Hak suara terproteksi (1 Siswa = 1 Kali Pakai).`
+      };
+    } catch (err: any) {
+      console.error('Error sync 127 voters to Supabase:', err);
+      return {
+        success: false,
+        count: 0,
+        message: err.message || 'Gagal menyinkronkan 127 data siswa ke Supabase.'
+      };
+    }
+  }
+
+  public async getRegisteredVotersAsync(): Promise<RegisteredVoter[]> {
+    if (this.supabase && this.config.isConnected) {
+      return await this.fetchRegisteredVotersFromSupabase();
+    }
+    return this.getRegisteredVoters();
+  }
+
+  // 2. INSERT (TAMBAH) PEMILIH KE SUPABASE
+  public async addRegisteredVoter(voterData: Omit<RegisteredVoter, 'id' | 'hasVoted'>): Promise<RegisteredVoter> {
     const list = this.getRegisteredVoters();
     const cleanNisn = voterData.nisn.trim();
     if (list.some(v => v.nisn.toLowerCase() === cleanNisn.toLowerCase())) {
@@ -756,14 +1370,36 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
     };
     list.push(newVoter);
     this.saveRegisteredVoters(list);
+
+    if (this.supabase && this.config.isConnected) {
+      try {
+        await this.supabase.from('voters').insert([this.voterToRow(newVoter)]);
+      } catch (err) {
+        console.warn('Gagal insert voter ke Supabase:', err);
+      }
+    }
+
     return newVoter;
   }
 
-  public updateRegisteredVoter(voter: RegisteredVoter): void {
+  // 3. UPDATE (EDIT) PEMILIH DI SUPABASE
+  public async updateRegisteredVoter(voter: RegisteredVoter): Promise<void> {
     const list = this.getRegisteredVoters().map(v => v.id === voter.id ? voter : v);
     this.saveRegisteredVoters(list);
+
+    if (this.supabase && this.config.isConnected) {
+      try {
+        await this.supabase
+          .from('voters')
+          .update(this.voterToRow(voter))
+          .eq('nisn', voter.nisn);
+      } catch (err) {
+        console.warn('Gagal update voter di Supabase:', err);
+      }
+    }
   }
 
+  // 4. DELETE (HAPUS) PEMILIH DARI SUPABASE
   public async deleteRegisteredVoter(id: string): Promise<void> {
     const voter = this.getRegisteredVoters().find(v => v.id === id);
     const list = this.getRegisteredVoters().filter(v => v.id !== id);
@@ -771,34 +1407,20 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
 
     if (voter) {
       const voterNisn = voter.nisn.trim().toLowerCase();
-      // 1. Hapus NISN dari daftar yang sudah vote
       try {
         const nisnList: string[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.VOTED_NISN_LIST) || '[]');
         const filteredNisn = nisnList.filter(n => n.trim().toLowerCase() !== voterNisn);
         localStorage.setItem(STORAGE_KEYS.VOTED_NISN_LIST, JSON.stringify(filteredNisn));
       } catch {}
 
-      // 2. Tandai kode suara siswa ini agar tidak ditarik kembali dari Supabase
       const allLocal = this.getLocalVotes();
-      const votesOfThisStudent = allLocal.filter(v => v.nisn.trim().toLowerCase() === voterNisn);
-      if (votesOfThisStudent.length > 0) {
-        try {
-          const deletedCodes: string[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_VOTE_CODES) || '[]');
-          votesOfThisStudent.forEach(v => {
-            if (!deletedCodes.includes(v.voteCode)) deletedCodes.push(v.voteCode);
-          });
-          localStorage.setItem(STORAGE_KEYS.DELETED_VOTE_CODES, JSON.stringify(deletedCodes));
-        } catch {}
-      }
-
-      // 3. Hapus juga rekaman suara jika siswa ini sudah memilih
       const remainingVotes = allLocal.filter(v => v.nisn.trim().toLowerCase() !== voterNisn);
       localStorage.setItem(STORAGE_KEYS.VOTES, JSON.stringify(remainingVotes));
 
-      // 4. Hapus juga dari Supabase jika terhubung
       if (this.supabase && this.config.isConnected) {
         try {
           await this.supabase.from(this.config.tableName).delete().eq('nisn', voter.nisn);
+          await this.supabase.from('voters').delete().eq('nisn', voter.nisn);
         } catch (e) {
           console.warn('Gagal hapus vote dari Supabase:', e);
         }
@@ -806,15 +1428,29 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
     }
   }
 
-  public deleteAllRegisteredVoters(): void {
+  public async deleteAllRegisteredVoters(): Promise<void> {
     this.saveRegisteredVoters([]);
+    if (this.supabase && this.config.isConnected) {
+      try {
+        await this.supabase.from('voters').delete().neq('id', '___dummy___');
+      } catch (e) {
+        console.warn('Gagal hapus semua voters di Supabase:', e);
+      }
+    }
   }
 
-  public resetRegisteredVotersToDefault(): void {
+  public async resetRegisteredVotersToDefault(): Promise<void> {
     this.saveRegisteredVoters(INITIAL_REGISTERED_VOTERS);
+    if (this.supabase && this.config.isConnected) {
+      try {
+        await this.seedVotersToSupabase(INITIAL_REGISTERED_VOTERS);
+      } catch (e) {
+        console.warn('Gagal reset voters default di Supabase:', e);
+      }
+    }
   }
 
-  // Reset status vote siswa (misal jika ada kesalahan sistem / izin ulang vote)
+  // Reset status vote siswa (mengembalikan has_voted = false di lokal dan Supabase)
   public async resetVoterVoteStatus(nisn: string): Promise<void> {
     const cleanNisn = nisn.trim().toLowerCase();
     // 1. Reset di DPT
@@ -833,36 +1469,113 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
       localStorage.setItem(STORAGE_KEYS.VOTED_NISN_LIST, JSON.stringify(filtered));
     } catch {}
 
-    // 3. Tandai kode suara siswa ini agar tidak ditarik kembali dari Supabase
+    // 3. Hapus suara dari daftar votes jika ada
     const allLocal = this.getLocalVotes();
-    const votesOfThisStudent = allLocal.filter(v => v.nisn.trim().toLowerCase() === cleanNisn);
-    if (votesOfThisStudent.length > 0) {
-      try {
-        const deletedCodes: string[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.DELETED_VOTE_CODES) || '[]');
-        votesOfThisStudent.forEach(v => {
-          if (!deletedCodes.includes(v.voteCode)) deletedCodes.push(v.voteCode);
-        });
-        localStorage.setItem(STORAGE_KEYS.DELETED_VOTE_CODES, JSON.stringify(deletedCodes));
-      } catch {}
-    }
-
-    // 4. Hapus suara dari daftar votes jika ada
     const remainingVotes = allLocal.filter(v => v.nisn.trim().toLowerCase() !== cleanNisn);
     localStorage.setItem(STORAGE_KEYS.VOTES, JSON.stringify(remainingVotes));
 
-    // 5. Hapus dari Supabase jika terhubung
+    // 4. Update di Supabase tabel voters (has_voted = false) dan hapus dari tabel votes
     if (this.supabase && this.config.isConnected) {
       try {
         await this.supabase.from(this.config.tableName).delete().eq('nisn', nisn);
+        await this.supabase
+          .from('voters')
+          .update({ has_voted: false, vote_code: null, voted_at: null })
+          .ilike('nisn', nisn);
       } catch (e) {
-        console.warn('Gagal hapus vote siswa dari Supabase:', e);
+        console.warn('Gagal reset voter status di Supabase:', e);
       }
+    }
+  }
+
+  // 5. REAL-TIME SUBSCRIPTION KE SUPABASE UNTUK TABEL VOTERS
+  public subscribeVoters(callback: (voters: RegisteredVoter[]) => void): () => void {
+    if (!this.supabase || !this.config.isConnected) {
+      return () => {};
+    }
+    try {
+      const channelName = `realtime_voters_${Math.random().toString(36).substring(2, 8)}`;
+      const channel = this.supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'voters' },
+          async (payload) => {
+            console.log('📡 Perubahan status DPT voter realtime terdeteksi:', payload.eventType);
+            const fresh = await this.fetchRegisteredVotersFromSupabase();
+            callback(fresh);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        try {
+          this.supabase?.removeChannel(channel);
+        } catch (e) {
+          console.warn('Error removing channel:', e);
+        }
+      };
+    } catch (err) {
+      console.warn('Gagal membuat realtime subscription voters:', err);
+      return () => {};
     }
   }
 
   public findVoterByNisn(nisn: string): RegisteredVoter | undefined {
     const list = this.getRegisteredVoters();
     return list.find(v => v.nisn.trim().toLowerCase() === nisn.trim().toLowerCase());
+  }
+
+  // Login Siswa / Pemilih dengan Sinkronisasi Supabase Real-time
+  public async loginVoterAsync(
+    nisn: string, 
+    name?: string, 
+    studentClass?: string, 
+    gender?: 'L' | 'P'
+  ): Promise<{ success: boolean; voter?: RegisteredVoter; message: string; isNew?: boolean }> {
+    const cleanNisn = nisn.trim();
+    if (!cleanNisn) {
+      return { success: false, message: 'NISN tidak boleh kosong.' };
+    }
+
+    // 1. Cek langsung ke database Supabase jika aktif (Jaminan 1 Siswa = 1 Kali Pakai)
+    if (this.supabase && this.config.isConnected) {
+      try {
+        const { data } = await this.supabase
+          .from('voters')
+          .select('*')
+          .ilike('nisn', cleanNisn)
+          .limit(1);
+
+        if (data && data.length > 0) {
+          const remoteVoter = this.rowToVoter(data[0]);
+          
+          // Perbarui status lokal agar sinkron
+          const list = this.getRegisteredVoters();
+          const updatedList = list.map(v => v.nisn.toLowerCase() === cleanNisn.toLowerCase() ? remoteVoter : v);
+          this.saveRegisteredVoters(updatedList);
+
+          if (remoteVoter.hasVoted) {
+            return {
+              success: true,
+              voter: remoteVoter,
+              message: 'Hak suara Anda telah digunakan sebelumnya (1 Siswa = 1 Hak Suara).',
+            };
+          }
+
+          return {
+            success: true,
+            voter: remoteVoter,
+            message: 'Berhasil login ke bilik suara!',
+          };
+        }
+      } catch (e) {
+        console.warn('Gagal cek login ke Supabase, fallback ke data lokal:', e);
+      }
+    }
+
+    // 2. Fallback login lokal
+    return this.loginVoter(cleanNisn, name, studentClass, gender);
   }
 
   // Login Siswa / Pemilih
@@ -892,7 +1605,7 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
         success: true,
         voter: existing,
         message: existing.hasVoted 
-          ? 'Anda telah menggunakan hak suara sebelumnya.'
+          ? 'Anda telah menggunakan hak suara sebelumnya (1 Siswa = 1 Hak Suara).'
           : 'Berhasil login ke bilik suara.',
       };
     }
@@ -906,12 +1619,23 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
         };
       }
 
-      const newVoter = this.addRegisteredVoter({
+      const newVoter: RegisteredVoter = {
+        id: `voter-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         nisn: cleanNisn,
         name: name.trim(),
         studentClass: studentClass.trim(),
         gender: gender || 'L',
-      });
+        hasVoted: false,
+      };
+
+      const list = this.getRegisteredVoters();
+      list.push(newVoter);
+      this.saveRegisteredVoters(list);
+
+      // Simpan juga ke Supabase jika terhubung
+      if (this.supabase && this.config.isConnected) {
+        this.supabase.from('voters').insert([this.voterToRow(newVoter)]).then();
+      }
 
       return {
         success: true,
@@ -933,7 +1657,16 @@ CREATE INDEX IF NOT EXISTS idx_${table}_created_at ON public.${table} (created_a
   public getElectionSettings(): ElectionSettings {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ELECTION_SETTINGS);
-      return data ? { ...DEFAULT_ELECTION_SETTINGS, ...JSON.parse(data) } : DEFAULT_ELECTION_SETTINGS;
+      if (!data) return DEFAULT_ELECTION_SETTINGS;
+      const parsed = JSON.parse(data);
+      // Migrasi otomatis jika masih ada nilai placeholder lama
+      if (!parsed.schoolName || parsed.schoolName.includes('SMA Negeri 1 Bulutangkis')) {
+        parsed.schoolName = 'SMAN 1 CIKAMPEK';
+      }
+      if (!parsed.schoolLogoUrl || parsed.schoolLogoUrl === '') {
+        parsed.schoolLogoUrl = './logo-sman1cikampek.svg';
+      }
+      return { ...DEFAULT_ELECTION_SETTINGS, ...parsed };
     } catch {
       return DEFAULT_ELECTION_SETTINGS;
     }
